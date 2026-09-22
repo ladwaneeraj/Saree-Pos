@@ -18,7 +18,7 @@ type Slow = InventoryReport["slowMoving"][number];
 export function InventoryReportView({ data, canSeeCost }: { data: InventoryReport | undefined; canSeeCost: boolean }) {
   const router = useRouter();
   const t = data?.totals;
-  const open = (id: string) => router.push(`/designs/${id}`);
+  const open = (id: string) => router.push(`/designs/view?id=${id}`);
 
   return (
     <div className="space-y-5">

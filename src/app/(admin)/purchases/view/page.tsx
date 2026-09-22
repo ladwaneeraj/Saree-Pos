@@ -1,8 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
+import { useQueryParam } from "@/hooks/use-query-param";
+
 import { Ban, PackageCheck, PackageSearch, Printer } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,8 +27,8 @@ import { useCan } from "@/stores/session";
 type Line = PurchaseDetail["lines"][number];
 const PIECES_PAGE = 40;
 
-export default function PurchaseDetailPage() {
-  const { id } = useParams<{ id: string }>();
+function PurchaseDetailPageView() {
+  const id = useQueryParam("id");
   const { data, loading } = useLive(() => getPurchaseDetail(id), [id]);
   const catalog = useCatalog();
   const canSeeCost = useCan("cost:view");
@@ -66,7 +68,7 @@ export default function PurchaseDetailPage() {
   };
 
   const lineColumns: Column<Line>[] = [
-    { key: "design", header: "Design", cell: (l) => <Link href={`/designs/${l.designId}`} className="font-medium hover:underline">{l.designName}</Link> },
+    { key: "design", header: "Design", cell: (l) => <Link href={`/designs/view?id=${l.designId}`} className="font-medium hover:underline">{l.designName}</Link> },
     { key: "colour", header: "Colour", cell: (l) => <span className="inline-flex items-center gap-2"><ColourDot hex={catalog?.colourById.get(l.colourId)?.hex ?? "#999"} />{l.colourName}</span> },
     { key: "qty", header: "Qty", align: "right", cell: (l) => formatNumber(l.quantity) },
     ...(canSeeCost ? [{ key: "cost", header: "Cost", align: "right" as const, cell: (l: Line) => formatINR(l.cost) }] : []),
@@ -77,7 +79,7 @@ export default function PurchaseDetailPage() {
   ];
 
   const pieceColumns: Column<InventoryItem>[] = [
-    { key: "sku", header: "SKU", cell: (p) => <Link href={`/inventory/${p.sku}`} className="font-mono text-[13px] font-medium text-primary hover:underline">{p.sku}</Link> },
+    { key: "sku", header: "SKU", cell: (p) => <Link href={`/inventory/item?sku=${p.sku}`} className="font-mono text-[13px] font-medium text-primary hover:underline">{p.sku}</Link> },
     { key: "design", header: "Design", cell: (p) => <span className="block max-w-64 truncate">{designNames.get(p.designId)}</span> },
     { key: "colour", header: "Colour", cell: (p) => { const c = catalog?.colourById.get(p.colourId); return <span className="inline-flex items-center gap-2"><ColourDot hex={c?.hex ?? "#999"} />{c?.name}</span>; } },
     { key: "rack", header: "Rack", cell: (p) => <span className="font-mono text-xs">{p.location}</span> },
@@ -140,7 +142,7 @@ export default function PurchaseDetailPage() {
                   rows={pieces.slice((page - 1) * PIECES_PAGE, page * PIECES_PAGE)}
                   rowKey={(p) => p.id}
                   mobileCard={(p) => (
-                    <Link href={`/inventory/${p.sku}`} className="flex items-center justify-between gap-2">
+                    <Link href={`/inventory/item?sku=${p.sku}`} className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <div className="font-mono text-sm font-medium text-primary">{p.sku}</div>
                         <div className="truncate text-xs text-muted-foreground">{designNames.get(p.designId)} · {catalog?.colourById.get(p.colourId)?.name}</div>
@@ -186,5 +188,13 @@ export default function PurchaseDetailPage() {
       <ReceivedDialog info={received} canSeeCost={canSeeCost} onPurchasePage onClose={() => setReceived(null)} />
       {dialog}
     </>
+  );
+}
+
+export default function PurchaseDetailPage() {
+  return (
+    <Suspense>
+      <PurchaseDetailPageView />
+    </Suspense>
   );
 }

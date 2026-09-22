@@ -52,7 +52,7 @@ export function ReceivedDialog({ info, onClose, canSeeCost, onPurchasePage = fal
                 <Button variant="outline" className="w-full" onClick={onClose}>Done</Button>
               ) : (
                 <Button variant="outline" asChild className="w-full">
-                  <Link href={`/purchases/${info.purchaseId}`}>View purchase</Link>
+                  <Link href={`/purchases/view?id=${info.purchaseId}`}>View purchase</Link>
                 </Button>
               )}
             </DialogFooter>

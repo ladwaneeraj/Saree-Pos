@@ -78,7 +78,7 @@ export function MessageBubble({ message, product, order }: { message: WaMessage;
           {description && <p className="mt-1 line-clamp-2 text-[13px] text-[#54656f]">{description}</p>}
           <Meta at={message.createdAt} out={out} />
         </div>
-        <Link href={`/store/p/${product.slug}`} target="_blank" className="mt-1 flex items-center justify-center gap-1.5 border-t border-black/5 py-2 text-[14px] font-medium text-[#008069] hover:bg-black/[0.03]">
+        <Link href={`/store/p?slug=${product.slug}`} target="_blank" className="mt-1 flex items-center justify-center gap-1.5 border-t border-black/5 py-2 text-[14px] font-medium text-[#008069] hover:bg-black/[0.03]">
           <ExternalLink className="size-4" /> View product
         </Link>
       </Bubble>

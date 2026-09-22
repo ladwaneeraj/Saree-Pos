@@ -1,12 +1,13 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import { Suspense } from "react";
+import { useQueryParam } from "@/hooks/use-query-param";
+
 import { useCatalog } from "@/hooks/use-catalog";
 import { ProductListing } from "@/components/store/product-listing";
 
-export default function CollectionPage() {
-  const { slug } = useParams<{ slug: string }>();
+function CollectionPageView() {
+  const slug = useQueryParam("slug");
   const catalog = useCatalog();
   const collection = catalog?.collections.find((c) => c.slug === slug);
   return (
@@ -17,6 +18,14 @@ export default function CollectionPage() {
         title={collection?.name ?? (catalog ? "Collection" : "")}
         description={collection?.description ?? (catalog ? "This collection could not be found." : undefined)}
       />
+    </Suspense>
+  );
+}
+
+export default function CollectionPage() {
+  return (
+    <Suspense>
+      <CollectionPageView />
     </Suspense>
   );
 }

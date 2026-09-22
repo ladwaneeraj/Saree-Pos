@@ -187,7 +187,7 @@ function StoreHeader() {
 
 const BOTTOM_NAV = [
   { href: "/store", label: "Home", icon: Home, match: (p: string) => p === "/store" },
-  { href: "/store/sarees", label: "Shop", icon: Store, match: (p: string) => p.startsWith("/store/sarees") || p.startsWith("/store/collections") || p.startsWith("/store/p/") },
+  { href: "/store/sarees", label: "Shop", icon: Store, match: (p: string) => p.startsWith("/store/sarees") || p.startsWith("/store/collections") || p.startsWith("/store/p") },
   { href: "/store/wishlist", label: "Wishlist", icon: Heart, match: (p: string) => p.startsWith("/store/wishlist") },
   { href: "/store/cart", label: "Cart", icon: ShoppingBag, match: (p: string) => p.startsWith("/store/cart") || p.startsWith("/store/checkout") },
   { href: "/store/track", label: "Track", icon: Truck, match: (p: string) => p.startsWith("/store/track") || p.startsWith("/store/order") },

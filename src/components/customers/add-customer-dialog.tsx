@@ -41,7 +41,7 @@ export function AddCustomerDialog({ open, onOpenChange }: { open: boolean; onOpe
       setF(EMPTY);
       setTouched(false);
       onOpenChange(false);
-      router.push(`/customers/${c.id}`);
+      router.push(`/customers/view?id=${c.id}`);
     }
   };
 

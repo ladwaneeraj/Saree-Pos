@@ -1,8 +1,11 @@
 "use client";
 
+import { Suspense } from "react";
+import { useQueryParam } from "@/hooks/use-query-param";
+
 import { BellRing, Check, ChevronRight, Clock, Share2, ShoppingBag, Sparkles, Truck, Zap } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -21,8 +24,8 @@ import { Container, ReviewCard, SectionHeading, Stars } from "@/components/store
 import { useStore } from "@/components/store/store-context";
 import { WishlistButton } from "@/components/store/wishlist-button";
 
-export default function ProductPage() {
-  const { slug } = useParams<{ slug: string }>();
+function ProductPageView() {
+  const slug = useQueryParam("slug");
   const { data: product } = useLive(() => getStoreProduct(slug), [slug]);
 
   if (product === undefined) return <ProductSkeleton />;
@@ -271,5 +274,13 @@ function ProductSkeleton() {
         <Skeleton className="h-32 w-full" />
       </div>
     </Container>
+  );
+}
+
+export default function ProductPage() {
+  return (
+    <Suspense>
+      <ProductPageView />
+    </Suspense>
   );
 }

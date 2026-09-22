@@ -41,7 +41,7 @@ function ListSkeleton() {
   );
 }
 
-const designHref = (id: string) => `/designs/${id}`;
+const designHref = (id: string) => `/designs/view?id=${id}`;
 
 export function LowStockPanel({ rows, threshold }: { rows: DashboardData["lowStock"] | undefined; threshold: number }) {
   return (

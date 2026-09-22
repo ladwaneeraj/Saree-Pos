@@ -96,7 +96,7 @@ function CustomerCard({ data }: { data: ConversationData }) {
         {customer && (
           <div className="mt-0.5 text-xs text-muted-foreground">
             {customer.stats.orderCount} order{customer.stats.orderCount === 1 ? "" : "s"} · {formatINR(customer.stats.totalSpend)} spent
-            <Link href={`/customers/${customer.id}`} className="ml-2 text-primary hover:underline">Profile</Link>
+            <Link href={`/customers/view?id=${customer.id}`} className="ml-2 text-primary hover:underline">Profile</Link>
           </div>
         )}
       </div>
@@ -155,7 +155,7 @@ function OrderRow({ order, conversationId }: { order: Order; conversationId: str
   return (
     <li className="rounded-lg border p-3" data-testid="wa-order">
       <div className="flex items-center gap-2">
-        <Link href={`/orders/${order.number}`} className="font-medium hover:text-primary hover:underline">#{order.number}</Link>
+        <Link href={`/orders/view?number=${order.number}`} className="font-medium hover:text-primary hover:underline">#{order.number}</Link>
         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
           {order.fulfilment === "SHIPPING" ? <Truck className="size-3.5" /> : <Store className="size-3.5" />}
           {order.fulfilment === "SHIPPING" ? "Delivery" : "Pickup"}
@@ -254,7 +254,7 @@ function CatalogueRow({ product, conversationId }: { product: StoreProduct; conv
       <div className="mt-2 grid grid-cols-3 gap-1.5">
         <Button size="xs" variant="outline" onClick={() => send.run(conversationId, product.design.id)} disabled={send.pending} data-testid="wa-send-product"><Send /> Send</Button>
         <Button size="xs" variant="outline" onClick={() => hold.run(conversationId, { designId: product.design.id, colourId })} disabled={hold.pending || product.available === 0} data-testid="wa-hold"><Hand /> Hold</Button>
-        <Button size="xs" variant="ghost" asChild><Link href={`/store/p/${product.design.slug}`} target="_blank"><ExternalLink /> View</Link></Button>
+        <Button size="xs" variant="ghost" asChild><Link href={`/store/p?slug=${product.design.slug}`} target="_blank"><ExternalLink /> View</Link></Button>
       </div>
     </li>
   );

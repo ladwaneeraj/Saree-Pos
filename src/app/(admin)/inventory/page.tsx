@@ -180,7 +180,7 @@ export default function InventoryPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => router.push(`/inventory/${r.item.sku}`)}>
+              <DropdownMenuItem onSelect={() => router.push(`/inventory/item?sku=${r.item.sku}`)}>
                 <Eye /> View details
               </DropdownMenuItem>
               {canEdit && (
@@ -386,7 +386,7 @@ export default function InventoryPage() {
         columns={columns}
         rows={data?.rows}
         rowKey={(r) => r.item.id}
-        onRowClick={(r) => router.push(`/inventory/${r.item.sku}`)}
+        onRowClick={(r) => router.push(`/inventory/item?sku=${r.item.sku}`)}
         sort={sort}
         onSortChange={(s) => { setSort(s); setPage(1); }}
         selectable

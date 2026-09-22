@@ -89,14 +89,14 @@ export default function CartPage() {
           <ul className="divide-y border-y">
             {lines.map((l) => (
               <li key={l.item.id} className="flex gap-4 py-5" data-testid="cart-line">
-                <Link href={`/store/p/${l.design.slug}`} className="w-24 shrink-0 sm:w-32">
+                <Link href={`/store/p?slug=${l.design.slug}`} className="w-24 shrink-0 sm:w-32">
                   <MediaImage id={l.imageId} alt={l.design.name} thumb rounded="rounded-md" />
                 </Link>
                 <div className="flex min-w-0 flex-1 flex-col">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[11px] font-medium tracking-[0.12em] text-muted-foreground uppercase">{l.fabricName}</p>
-                      <Link href={`/store/p/${l.design.slug}`} className="mt-0.5 block font-medium leading-snug hover:underline">{l.design.name}</Link>
+                      <Link href={`/store/p?slug=${l.design.slug}`} className="mt-0.5 block font-medium leading-snug hover:underline">{l.design.name}</Link>
                       {l.colour && (
                         <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                           <ColourDot hex={l.colour.hex} /> {l.colour.name}

@@ -99,7 +99,7 @@ export function PurchaseForm() {
       if (receiveNow) {
         setReceived({ purchaseId: result.purchase.id, number: result.purchase.number, pieces: result.items.length, totalCost: result.purchase.totalCost, firstSku: result.items[0]?.sku, lastSku: result.items.at(-1)?.sku });
       } else {
-        router.push(`/purchases/${result.purchase.id}`);
+        router.push(`/purchases/view?id=${result.purchase.id}`);
       }
     })();
 
@@ -180,7 +180,7 @@ export function PurchaseForm() {
         <Summary control={form.control} pending={save.pending} mode={mode} onDraft={() => void submit(false)} />
       </form>
       <SupplierDialog open={supplierOpen} onOpenChange={setSupplierOpen} onCreated={(s) => form.setValue("supplierId", s.id, { shouldValidate: true })} />
-      <ReceivedDialog info={received} canSeeCost onClose={() => router.push(received ? `/purchases/${received.purchaseId}` : "/purchases")} />
+      <ReceivedDialog info={received} canSeeCost onClose={() => router.push(received ? `/purchases/view?id=${received.purchaseId}` : "/purchases")} />
     </Form>
   );
 }

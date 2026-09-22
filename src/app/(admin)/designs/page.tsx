@@ -182,7 +182,7 @@ export default function DesignsPage() {
       ) : view === "grid" ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 2xl:grid-cols-5">
           {data
-            ? rows.map((s) => <DesignCard key={s.design.id} s={s} canEdit={canEdit} onOpen={() => router.push(`/designs/${s.design.id}`)} onPublish={(on) => togglePublish(s, on)} />)
+            ? rows.map((s) => <DesignCard key={s.design.id} s={s} canEdit={canEdit} onOpen={() => router.push(`/designs/view?id=${s.design.id}`)} onPublish={(on) => togglePublish(s, on)} />)
             : Array.from({ length: 8 }, (_, i) => (
                 <div key={i} className="space-y-2">
                   <Skeleton className="aspect-[4/5] rounded-xl" />
@@ -196,7 +196,7 @@ export default function DesignsPage() {
           columns={columns}
           rows={data ? rows : undefined}
           rowKey={(s) => s.design.id}
-          onRowClick={(s) => router.push(`/designs/${s.design.id}`)}
+          onRowClick={(s) => router.push(`/designs/view?id=${s.design.id}`)}
           mobileCard={(s) => (
             <div className="flex gap-3">
               <MediaImage id={s.imageId} alt={s.design.name} thumb className="w-14 shrink-0" rounded="rounded-md" />

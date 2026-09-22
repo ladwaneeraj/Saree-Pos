@@ -1,8 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
+import { useQueryParam } from "@/hooks/use-query-param";
+
 import { AlertTriangle, ArrowUpRight, Clock, Mail, MapPin, Phone, ReceiptText, RotateCcw, Truck, User } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
 import { MediaImage } from "@/components/shared/media-image";
@@ -28,8 +30,8 @@ function eventTone(e: OrderEvent): TimelineEntry["tone"] {
   return "default";
 }
 
-export default function OrderDetailPage() {
-  const params = useParams<{ number: string }>();
+function OrderDetailPageView() {
+  const params = { number: useQueryParam("number") };
   const key = decodeURIComponent(params.number);
   const { data } = useLive(() => getOrderDetail(key), [key]);
 
@@ -212,7 +214,7 @@ function LineRow({ line }: { line: OrderLine }) {
           <div className="min-w-0">
             <div className="font-medium">{line.designName}</div>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-              <Link href={`/inventory/${line.sku}`} className="font-mono font-medium text-primary hover:underline">
+              <Link href={`/inventory/item?sku=${line.sku}`} className="font-mono font-medium text-primary hover:underline">
                 {line.sku}
               </Link>
               <span>·</span>
@@ -306,7 +308,7 @@ function CustomerCard({ detail }: { detail: OrderDetail }) {
       <SectionTitle
         action={
           customer && (
-            <Link href={`/customers/${customer.id}`} className="inline-flex items-center gap-0.5 text-xs font-medium text-primary hover:underline">
+            <Link href={`/customers/view?id=${customer.id}`} className="inline-flex items-center gap-0.5 text-xs font-medium text-primary hover:underline">
               View profile <ArrowUpRight className="size-3" />
             </Link>
           )
@@ -320,7 +322,7 @@ function CustomerCard({ detail }: { detail: OrderDetail }) {
         </div>
         <div className="min-w-0">
           {customer ? (
-            <Link href={`/customers/${customer.id}`} className="font-medium hover:underline">{order.customer.name}</Link>
+            <Link href={`/customers/view?id=${customer.id}`} className="font-medium hover:underline">{order.customer.name}</Link>
           ) : (
             <div className="font-medium">{order.customer.name}</div>
           )}
@@ -398,5 +400,13 @@ function DetailSkeleton() {
         <Skeleton className="h-72 rounded-xl" />
       </div>
     </div>
+  );
+}
+
+export default function OrderDetailPage() {
+  return (
+    <Suspense>
+      <OrderDetailPageView />
+    </Suspense>
   );
 }

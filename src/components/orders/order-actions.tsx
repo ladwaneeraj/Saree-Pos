@@ -1,5 +1,8 @@
 "use client";
 
+import { withBase } from "@/lib/base-path";
+import { appOrigin } from "@/services/context";
+
 import {
   Ban,
   CheckCircle2,
@@ -48,7 +51,7 @@ type DialogKind = null | "payment" | "cancel" | "return" | "note" | "dispatch" |
 const SHIPMENT_LABEL: Record<ShipmentStatus, string> = { DISPATCHED: "Dispatched", IN_TRANSIT: "In transit", OUT_FOR_DELIVERY: "Out for delivery", DELIVERED: "Delivered" };
 
 export function trackingPath(orderId: string): string {
-  return `/track/${orderId}`;
+  return `/track?id=${orderId}`;
 }
 
 /** Contextual actions for an order, driven by its status and the signed-in role. */
@@ -79,7 +82,7 @@ export function OrderActions({ detail }: { detail: OrderDetail }) {
     lines: activeLines.map((l) => ({ id: l.id, sku: l.sku, designName: l.designName, colourName: l.colourName, imageId: l.imageId, location: l.location })),
   };
 
-  const trackingUrl = typeof window === "undefined" ? trackingPath(order.id) : `${window.location.origin}${trackingPath(order.id)}`;
+  const trackingUrl = typeof window === "undefined" ? trackingPath(order.id) : `${appOrigin()}${trackingPath(order.id)}`;
 
   const primary: React.ReactNode[] = [];
   if (canManage && (s === "PAYMENT_PENDING" || s === "NEW"))
@@ -140,7 +143,7 @@ export function OrderActions({ detail }: { detail: OrderDetail }) {
             <Copy /> Copy tracking link
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <a href={trackingPath(order.id)} target="_blank" rel="noreferrer">
+            <a href={withBase(trackingPath(order.id))} target="_blank" rel="noreferrer">
               <ExternalLink /> Open tracking page
             </a>
           </DropdownMenuItem>

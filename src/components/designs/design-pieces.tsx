@@ -63,7 +63,7 @@ export function DesignPieces({ pieces }: { pieces: InventoryRow[] }) {
                 <ul className="divide-y">
                   {group.map((p) => (
                     <li key={p.item.id}>
-                      <Link href={`/inventory/${p.item.sku}`} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-2.5 text-sm hover:bg-accent/50 sm:grid-cols-[6.5rem_7.5rem_minmax(0,1fr)_7rem_5.5rem] sm:px-5">
+                      <Link href={`/inventory/item?sku=${p.item.sku}`} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-2.5 text-sm hover:bg-accent/50 sm:grid-cols-[6.5rem_7.5rem_minmax(0,1fr)_7rem_5.5rem] sm:px-5">
                         <span className="font-mono text-[13px] font-medium">{p.item.sku}</span>
                         <span className="justify-self-end sm:justify-self-start"><InventoryStatusBadge status={p.item.status} /></span>
                         <span className="col-span-2 truncate text-xs text-muted-foreground sm:col-span-1">Rack <span className="font-mono">{p.item.location}</span> · received {formatDate(p.item.receivedAt)}</span>

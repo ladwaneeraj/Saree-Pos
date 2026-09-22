@@ -11,9 +11,15 @@ First launch seeds ~10,600 sarees, 1,800+ orders, customers, suppliers and Whats
 
 Seeded product photos load from Unsplash (free licence), so the demo machine needs internet. Photos staff upload are stored locally.
 
+## Live demo (GitHub Pages)
+Every push to `vasra-wip` or `main` builds a static export and deploys it with `.github/workflows/pages.yml`:
+https://ladwaneeraj.github.io/Saree-Pos/
+One-time setup: repo Settings > Pages > Source: GitHub Actions.
+
 ## Where things are
 - Admin: /dashboard, /inventory (quick add, bulk photo entry, labels), /designs, /purchases (+ Excel/CSV import), /pos, /orders, /whatsapp, /dispatch, /returns, /customers, /reports, /activity, /settings
-- Customer store: /store, tracking: /track/<orderId>
+- Customer store: /store, tracking: /track?id=<orderId>
+- Detail pages use query strings (e.g. /orders/view?number=10452) so the app exports as static files.
 - Switch demo user/role from the bottom of the sidebar. Shortcuts: / search, N new order, P POS, I inventory.
 
 ## Architecture

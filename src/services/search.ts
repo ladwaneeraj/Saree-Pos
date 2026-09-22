@@ -40,7 +40,7 @@ export async function globalSearch(query: string, limitPerKind = 6): Promise<Sea
       id: item.id,
       title: item.sku,
       subtitle: `${design?.name ?? ""} · ${catalog.colourById.get(item.colourId)?.name ?? ""} · ${item.status.toLowerCase()} · ${item.location}`,
-      href: `/inventory/${item.sku}`,
+      href: `/inventory/item?sku=${item.sku}`,
       imageId: item.imageIds[0] ?? design?.imageIds[0] ?? null,
     });
   }
@@ -51,7 +51,7 @@ export async function globalSearch(query: string, limitPerKind = 6): Promise<Sea
       id: d.id,
       title: d.name,
       subtitle: `${d.code} · ${catalog.fabricById.get(d.fabricId)?.name ?? ""}`,
-      href: `/designs/${d.id}`,
+      href: `/designs/view?id=${d.id}`,
       imageId: d.imageIds[0] ?? null,
     });
   }
@@ -61,11 +61,11 @@ export async function globalSearch(query: string, limitPerKind = 6): Promise<Sea
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, limitPerKind);
   for (const o of orderHits) {
-    results.push({ kind: "ORDER", id: o.id, title: `Order #${o.number}`, subtitle: `${o.customer.name} · ${o.channel.toLowerCase()} · ${o.status.replace(/_/g, " ").toLowerCase()}`, href: `/orders/${o.number}`, imageId: null });
+    results.push({ kind: "ORDER", id: o.id, title: `Order #${o.number}`, subtitle: `${o.customer.name} · ${o.channel.toLowerCase()} · ${o.status.replace(/_/g, " ").toLowerCase()}`, href: `/orders/view?number=${o.number}`, imageId: null });
   }
 
   for (const c of customers.filter((c) => c.name.toLowerCase().includes(q) || (digits.length >= 4 && c.phone.includes(digits)) || c.email.toLowerCase().includes(q)).slice(0, limitPerKind)) {
-    results.push({ kind: "CUSTOMER", id: c.id, title: c.name, subtitle: `${c.phone} · ${c.stats.orderCount} orders`, href: `/customers/${c.id}`, imageId: null });
+    results.push({ kind: "CUSTOMER", id: c.id, title: c.name, subtitle: `${c.phone} · ${c.stats.orderCount} orders`, href: `/customers/view?id=${c.id}`, imageId: null });
   }
 
   for (const s of catalog.suppliers.filter((s) => `${s.name} ${s.city} ${s.contactName}`.toLowerCase().includes(q)).slice(0, limitPerKind)) {

@@ -61,7 +61,7 @@ export function CollectionTiles({ collections, limit }: { collections: StoreHome
       {!rows
         ? Array.from({ length: limit ?? 6 }, (_, i) => <Skeleton key={i} className="aspect-[4/5] rounded-md" />)
         : rows.map((c) => (
-            <Link key={c.slug} href={`/store/collections/${c.slug}`} className="group relative block overflow-hidden rounded-md">
+            <Link key={c.slug} href={`/store/collections/view?slug=${c.slug}`} className="group relative block overflow-hidden rounded-md">
               <MediaImage id={c.imageId} alt={c.name} rounded="rounded-md" className="transition duration-700 group-hover:scale-[1.03]" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
               <div className="absolute inset-x-0 bottom-0 p-4 text-white sm:p-6">

@@ -1,8 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
+import { useQueryParam } from "@/hooks/use-query-param";
+
 import { ArrowRight, Check, MapPin, MessageCircle, PackageSearch } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,8 +14,8 @@ import { getTrackingView } from "@/services/storefront";
 import { OrderLines, WhatsAppBubble } from "@/components/store/order-bits";
 import { Container, Eyebrow } from "@/components/store/sections";
 
-export default function OrderSuccessPage() {
-  const { id } = useParams<{ id: string }>();
+function OrderSuccessPageView() {
+  const id = useQueryParam("id");
   const { data: view } = useLive(() => getTrackingView(id), [id]);
 
   if (view === undefined)
@@ -51,7 +53,7 @@ export default function OrderSuccessPage() {
         </p>
         <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
           <Button asChild size="lg" className="h-12 px-7">
-            <Link href={`/track/${order.id}`}>
+            <Link href={`/track?id=${order.id}`}>
               Track order <ArrowRight />
             </Link>
           </Button>
@@ -98,5 +100,13 @@ export default function OrderSuccessPage() {
         </div>
       </div>
     </Container>
+  );
+}
+
+export default function OrderSuccessPage() {
+  return (
+    <Suspense>
+      <OrderSuccessPageView />
+    </Suspense>
   );
 }

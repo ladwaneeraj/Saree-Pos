@@ -468,7 +468,7 @@ export function generateDemoData(now: number, origin: string): SeedTables {
   const taxRate = DEFAULT_SETTINGS.tax.gstRate;
   const templates = DEFAULT_SETTINGS.notifications.templates;
   const storeName = DEFAULT_SETTINGS.business.name;
-  const trackingLink = (id: string) => `${origin}/track/${id}`;
+  const trackingLink = (id: string) => `${origin}/track?id=${id}`;
 
   const pushNotification = (event: NotificationEvent, order: Order, at: number, vars: Record<string, string> = {}) => {
     const message = renderTemplate(templates[event], {
@@ -991,7 +991,7 @@ export function generateDemoData(now: number, origin: string): SeedTables {
           conversationId: convId,
           direction: "OUT",
           kind: "PRODUCT",
-          text: [`*${design.name}*`, formatINR(price), design.description, available === 1 ? "Available: 1 piece" : `Available: ${available} pieces`, `View product: ${origin}/store/p/${design.slug}`].join("\n"),
+          text: [`*${design.name}*`, formatINR(price), design.description, available === 1 ? "Available: 1 piece" : `Available: ${available} pieces`, `View product: ${origin}/store/p?slug=${design.slug}`].join("\n"),
           designId: design.id,
           orderId: null,
           amount: null,

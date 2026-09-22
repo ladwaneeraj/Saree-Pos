@@ -28,7 +28,7 @@ export default function TrackLookupPage() {
   const onSubmit = async (v: Values) => {
     setNotFound(false);
     const id = await findOrderForTracking(v.orderNumber, v.phone);
-    if (id) router.push(`/track/${id}`);
+    if (id) router.push(`/track?id=${id}`);
     else setNotFound(true);
   };
 

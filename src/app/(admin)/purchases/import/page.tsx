@@ -226,7 +226,7 @@ export default function ImportPurchasePage() {
       )}
 
       <SupplierDialog open={supplierOpen} onOpenChange={setSupplierOpen} onCreated={(s) => setSupplierId(s.id)} />
-      <ReceivedDialog info={received} canSeeCost onClose={() => router.push(received ? `/purchases/${received.purchaseId}` : "/purchases")} />
+      <ReceivedDialog info={received} canSeeCost onClose={() => router.push(received ? `/purchases/view?id=${received.purchaseId}` : "/purchases")} />
     </>
   );
 }

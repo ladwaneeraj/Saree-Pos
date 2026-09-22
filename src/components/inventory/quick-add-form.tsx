@@ -327,7 +327,7 @@ export function QuickAddForm() {
                         {existing ? (
                           <>
                             Existing design {existing.code}: fabric, collection and details come from the design.{" "}
-                            <Link href={`/designs/${existing.id}`} className="text-primary hover:underline">Edit design</Link>
+                            <Link href={`/designs/view?id=${existing.id}`} className="text-primary hover:underline">Edit design</Link>
                           </>
                         ) : v.designName ? (
                           "A new design will be created with the details below."
@@ -497,7 +497,7 @@ export function QuickAddForm() {
                       <li key={a.at} className="flex items-center gap-3 px-4 py-2.5">
                         <CheckCircle2 className="size-4 shrink-0 text-success" />
                         <div className="min-w-0 flex-1">
-                          <Link href={`/inventory/${a.items[0]!.sku}`} className="font-mono text-sm font-medium hover:underline">
+                          <Link href={`/inventory/item?sku=${a.items[0]!.sku}`} className="font-mono text-sm font-medium hover:underline">
                             {a.items.length === 1 ? a.items[0]!.sku : `${a.items[0]!.sku} – ${a.items.at(-1)!.sku}`}
                           </Link>
                           <div className="truncate text-xs text-muted-foreground">{a.label}</div>

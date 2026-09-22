@@ -38,7 +38,7 @@ export function NewDesignDialog({ open, onOpenChange }: { open: boolean; onOpenC
     if (design) {
       setV(EMPTY);
       onOpenChange(false);
-      router.push(`/designs/${design.id}`);
+      router.push(`/designs/view?id=${design.id}`);
     }
   };
 

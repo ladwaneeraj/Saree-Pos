@@ -158,7 +158,7 @@ function Purchases() {
         columns={columns}
         rows={pageRows}
         rowKey={(r) => r.purchase.id}
-        onRowClick={(r) => router.push(`/purchases/${r.purchase.id}`)}
+        onRowClick={(r) => router.push(`/purchases/view?id=${r.purchase.id}`)}
         mobileCard={(r) => (
           <div>
             <div className="flex items-center justify-between gap-2">

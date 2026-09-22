@@ -1,8 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
+import { useQueryParam } from "@/hooks/use-query-param";
+
 import { Check, ChevronDown, MapPin, MessageCircle, PackageSearch, Truck, XCircle } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { CopyButton } from "@/components/shared/misc";
@@ -19,8 +21,8 @@ import { OrderLines, WhatsAppBubble } from "@/components/store/order-bits";
 import { ReturnSection, ReviewSection } from "@/components/store/tracking-forms";
 import type { ReturnStatus } from "@/domain/types";
 
-export default function TrackOrderPage() {
-  const { orderId } = useParams<{ orderId: string }>();
+function TrackOrderPageView() {
+  const orderId = useQueryParam("id");
   const { data: view } = useLive(() => getTrackingView(orderId), [orderId]);
 
   useEffect(() => {
@@ -186,5 +188,13 @@ function Tracking({ view }: { view: TrackingView }) {
         <MessageCircle className="size-5" /> Chat with {view.storeName} on WhatsApp
       </a>
     </div>
+  );
+}
+
+export default function TrackOrderPage() {
+  return (
+    <Suspense>
+      <TrackOrderPageView />
+    </Suspense>
   );
 }

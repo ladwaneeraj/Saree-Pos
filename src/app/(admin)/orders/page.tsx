@@ -208,7 +208,7 @@ function OrdersView() {
         columns={columns}
         rows={data?.rows}
         rowKey={(r) => r.order.id}
-        onRowClick={(r) => router.push(`/orders/${r.order.number}`)}
+        onRowClick={(r) => router.push(`/orders/view?number=${r.order.number}`)}
         mobileCard={(r) => (
           <div className="flex gap-3">
             <MediaImage id={r.firstImageId} alt={r.firstItemName} thumb className="w-12 shrink-0" rounded="rounded-md" />

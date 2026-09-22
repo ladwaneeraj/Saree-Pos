@@ -1,8 +1,12 @@
 "use client";
 
+import { withBase } from "@/lib/base-path";
+
+import { Suspense } from "react";
+import { useQueryParam } from "@/hooks/use-query-param";
+
 import { ExternalLink, History, Info, Pencil, Plus, SearchX, Share2 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,8 +30,8 @@ import { DesignAttributesForm } from "@/components/designs/design-attributes-for
 import { DesignPieces } from "@/components/designs/design-pieces";
 import { PriceChangeDialog } from "@/components/designs/price-change-dialog";
 
-export default function DesignDetailPage() {
-  const { id } = useParams<{ id: string }>();
+function DesignDetailPageView() {
+  const id = useQueryParam("id");
   const { data } = useLive(() => getDesignOverview(id), [id]);
   if (data === undefined) return <DesignSkeleton />;
   if (data === null) {
@@ -82,7 +86,7 @@ function DesignDetail({ overview }: { overview: DesignOverview }) {
               <Share2 /> Share product
             </Button>
             <Button variant="outline" asChild>
-              <a href={`/store/p/${design.slug}`} target="_blank" rel="noreferrer">
+              <a href={withBase(`/store/p?slug=${design.slug}`)} target="_blank" rel="noreferrer">
                 View on website <ExternalLink />
               </a>
             </Button>
@@ -240,5 +244,13 @@ function DesignSkeleton() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DesignDetailPage() {
+  return (
+    <Suspense>
+      <DesignDetailPageView />
+    </Suspense>
   );
 }

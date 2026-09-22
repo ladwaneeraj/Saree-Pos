@@ -152,7 +152,7 @@ export default function CustomersPage() {
         columns={columns}
         rows={rows}
         rowKey={(r) => r.customer.id}
-        onRowClick={(r) => router.push(`/customers/${r.customer.id}`)}
+        onRowClick={(r) => router.push(`/customers/view?id=${r.customer.id}`)}
         sort={sort}
         onSortChange={(s) => { setSort(s); setPage(1); }}
         mobileCard={(r) => (

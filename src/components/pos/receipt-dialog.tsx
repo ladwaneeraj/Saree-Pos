@@ -40,7 +40,7 @@ export function ReceiptDialog({ order, onNewSale }: { order: Order | null; onNew
           <DialogTitle className="text-xl">Sale completed</DialogTitle>
           <DialogDescription>
             {order ? (
-              <>Order <Link href={`/orders/${order.number}`} className="font-medium text-primary hover:underline" data-testid="receipt-order-link">#{order.number}</Link> · {formatINR(order.total)} received · pieces marked sold</>
+              <>Order <Link href={`/orders/view?number=${order.number}`} className="font-medium text-primary hover:underline" data-testid="receipt-order-link">#{order.number}</Link> · {formatINR(order.total)} received · pieces marked sold</>
             ) : null}
           </DialogDescription>
         </DialogHeader>
@@ -97,7 +97,7 @@ export function ReceiptDialog({ order, onNewSale }: { order: Order | null; onNew
           <div className="grid grid-cols-3 gap-2">
             <Button variant="outline" onClick={() => window.print()} disabled={!data}><Printer /> Print</Button>
             <Button variant="outline" asChild>
-              <Link href={order ? `/orders/${order.number}` : "#"}><ExternalLink /> Order</Link>
+              <Link href={order ? `/orders/view?number=${order.number}` : "#"}><ExternalLink /> Order</Link>
             </Button>
             <Button onClick={onNewSale} autoFocus data-testid="pos-new-sale"><Plus /> New sale</Button>
           </div>

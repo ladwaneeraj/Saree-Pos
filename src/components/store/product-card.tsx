@@ -14,7 +14,7 @@ export function ProductCard({ product, priority }: { product: StoreProduct; prio
   const availability = availabilityLabel(product.available, settings?.store.scarcityThreshold ?? 2);
   const soldOut = product.available === 0;
   return (
-    <Link href={`/store/p/${product.design.slug}`} className="group block min-w-0" data-testid="product-card">
+    <Link href={`/store/p?slug=${product.design.slug}`} className="group block min-w-0" data-testid="product-card">
       <div className="relative overflow-hidden rounded-md">
         <MediaImage id={product.imageId} alt={product.design.name} rounded="rounded-md" priority={priority} className={cn("transition duration-500 group-hover:scale-[1.02]", soldOut && "opacity-60")} />
         {product.hoverImageId && (

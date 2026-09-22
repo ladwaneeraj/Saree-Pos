@@ -23,11 +23,11 @@ const CTA: Partial<Record<NotificationEvent, string>> = {
 };
 
 export function trackingUrl(orderId: string): string {
-  return `${appOrigin()}/track/${orderId}`;
+  return `${appOrigin()}/track?id=${orderId}`;
 }
 
 export function productUrl(slug: string): string {
-  return `${appOrigin()}/store/p/${slug}`;
+  return `${appOrigin()}/store/p?slug=${slug}`;
 }
 
 export function renderTemplate(template: string, vars: Record<string, string>): string {

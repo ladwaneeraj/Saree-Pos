@@ -1,3 +1,4 @@
+import { BASE_PATH } from "@/lib/base-path";
 import type { Actor } from "@/domain/types";
 
 export const SYSTEM_ACTOR: Actor = { id: "system", name: "System", role: "SYSTEM" };
@@ -19,7 +20,7 @@ export function now(): number {
 }
 
 export function appOrigin(): string {
-  return typeof window === "undefined" ? "" : window.location.origin;
+  return typeof window === "undefined" ? BASE_PATH : `${window.location.origin}${BASE_PATH}`;
 }
 
 export const DAY_MS = 86_400_000;

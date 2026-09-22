@@ -72,7 +72,7 @@ function ReturnDetail({ returnId }: { returnId: string }) {
         </div>
         <SheetDescription>
           {ret.customerName} · order{" "}
-          <Link href={`/orders/${ret.orderNumber}`} className="font-medium text-primary hover:underline">
+          <Link href={`/orders/view?number=${ret.orderNumber}`} className="font-medium text-primary hover:underline">
             #{ret.orderNumber}
           </Link>{" "}
           · requested {formatDateTime(ret.createdAt)}
@@ -94,7 +94,7 @@ function ReturnDetail({ returnId }: { returnId: string }) {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{l.designName}</div>
                   <div className="text-xs text-muted-foreground">
-                    <Link href={`/inventory/${l.sku}`} className="font-mono text-primary hover:underline">{l.sku}</Link> · {l.colourName}
+                    <Link href={`/inventory/item?sku=${l.sku}`} className="font-mono text-primary hover:underline">{l.sku}</Link> · {l.colourName}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
@@ -126,7 +126,7 @@ function ReturnDetail({ returnId }: { returnId: string }) {
                   : `refunded ${formatINR(-ret.exchange.priceDifference)}`}
             </div>
             {ret.exchange.newOrderId && (
-              <Link href={`/orders/${ret.exchange.newOrderId}`} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+              <Link href={`/orders/view?number=${ret.exchange.newOrderId}`} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
                 Open replacement order <ArrowRight className="size-3" />
               </Link>
             )}
@@ -136,7 +136,7 @@ function ReturnDetail({ returnId }: { returnId: string }) {
         {order && (
           <section>
             <SectionTitle>Linked order</SectionTitle>
-            <Link href={`/orders/${order.order.number}`} className="flex items-center justify-between gap-3 rounded-lg border p-3 hover:bg-accent/50">
+            <Link href={`/orders/view?number=${order.order.number}`} className="flex items-center justify-between gap-3 rounded-lg border p-3 hover:bg-accent/50">
               <div>
                 <div className="text-sm font-medium">Order #{order.order.number}</div>
                 <div className="text-xs text-muted-foreground">

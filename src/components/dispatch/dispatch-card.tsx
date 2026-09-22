@@ -1,5 +1,7 @@
 "use client";
 
+import { withBase } from "@/lib/base-path";
+
 import { CheckCircle2, ExternalLink, MapPin, MoreHorizontal, Navigation, Package, PackageOpen, ScrollText, Truck } from "lucide-react";
 import Link from "next/link";
 import { useNow } from "@/hooks/use-now";
@@ -35,7 +37,7 @@ export function DispatchCardView({ card, column, handlers }: { card: Card; colum
     <div className="rounded-xl border bg-card p-3 shadow-xs transition-shadow hover:shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <Link href={`/orders/${order.number}`} className="font-semibold tabular hover:underline">
+          <Link href={`/orders/view?number=${order.number}`} className="font-semibold tabular hover:underline">
             #{order.number}
           </Link>
           <div className="truncate text-sm">{order.customer.name}</div>
@@ -128,7 +130,7 @@ export function DispatchCardView({ card, column, handlers }: { card: Card; colum
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
-              <Link href={`/orders/${order.number}`}>
+              <Link href={`/orders/view?number=${order.number}`}>
                 <Package /> Open order
               </Link>
             </DropdownMenuItem>
@@ -138,7 +140,7 @@ export function DispatchCardView({ card, column, handlers }: { card: Card; colum
               </DropdownMenuItem>
             )}
             <DropdownMenuItem asChild>
-              <a href={`/track/${order.id}`} target="_blank" rel="noreferrer">
+              <a href={withBase(`/track?id=${order.id}`)} target="_blank" rel="noreferrer">
                 <ExternalLink /> Tracking page
               </a>
             </DropdownMenuItem>

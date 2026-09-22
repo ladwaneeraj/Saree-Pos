@@ -1,5 +1,7 @@
 "use client";
 
+import { withBase } from "@/lib/base-path";
+
 import { ExternalLink, Keyboard, LayoutDashboard, Lock, Menu, MessageCircle, Search, ShoppingBag, Boxes, ReceiptText, Truck } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -128,7 +130,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
         <div className="space-y-2 border-t p-3">
           <Button asChild variant="outline" size="sm" className="w-full justify-between bg-card">
-            <a href="/store" target="_blank" rel="noreferrer">
+            <a href={withBase("/store")} target="_blank" rel="noreferrer">
               View website store <ExternalLink />
             </a>
           </Button>
@@ -194,7 +196,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <div className="flex-1 overflow-y-auto px-3"><NavLinks onNavigate={() => setNavOpen(false)} /></div>
             <div className="space-y-2 border-t p-3">
               <Button asChild variant="outline" size="sm" className="w-full justify-between bg-card">
-                <a href="/store" target="_blank" rel="noreferrer">View website store <ExternalLink /></a>
+                <a href={withBase("/store")} target="_blank" rel="noreferrer">View website store <ExternalLink /></a>
               </Button>
               <RoleSwitcher />
             </div>

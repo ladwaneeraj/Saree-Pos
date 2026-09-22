@@ -55,9 +55,9 @@ export const movementLabel = (type: MovementType) => META[type].label;
 
 function RefLink({ m }: { m: InventoryMovement }) {
   if (!m.refLabel) return null;
-  if (m.refType === "ORDER") return <Link href={`/orders/${m.refLabel.replace(/^#/, "")}`} className="font-medium text-primary hover:underline">Order {m.refLabel}</Link>;
-  if (m.refType === "PURCHASE" && m.refId) return <Link href={`/purchases/${m.refId}`} className="font-medium text-primary hover:underline">{m.refLabel}</Link>;
-  if (m.refType === "RETURN" && m.refId) return <Link href={`/returns/${m.refId}`} className="font-medium text-primary hover:underline">{m.refLabel}</Link>;
+  if (m.refType === "ORDER") return <Link href={`/orders/view?number=${m.refLabel.replace(/^#/, "")}`} className="font-medium text-primary hover:underline">Order {m.refLabel}</Link>;
+  if (m.refType === "PURCHASE" && m.refId) return <Link href={`/purchases/view?id=${m.refId}`} className="font-medium text-primary hover:underline">{m.refLabel}</Link>;
+  if (m.refType === "RETURN" && m.refId) return <Link href={`/returns?open=${m.refId}`} className="font-medium text-primary hover:underline">{m.refLabel}</Link>;
   return <span className="font-medium text-foreground">{m.refLabel}</span>;
 }
 

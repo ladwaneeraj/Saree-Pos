@@ -39,12 +39,12 @@ const ACTION_META: Record<AuditAction, { label: string; tone: Tone }> = {
 };
 
 const ENTITY_HREF: Partial<Record<AuditLog["entityType"], (id: string) => string>> = {
-  DESIGN: (id) => `/designs/${id}`,
-  INVENTORY: (id) => `/inventory/${id}`,
-  ORDER: (id) => `/orders/${id}`,
-  PURCHASE: (id) => `/purchases/${id}`,
-  RETURN: (id) => `/returns/${id}`,
-  CUSTOMER: (id) => `/customers/${id}`,
+  DESIGN: (id) => `/designs/view?id=${id}`,
+  INVENTORY: (id) => `/inventory/item?sku=${id}`,
+  ORDER: (id) => `/orders/view?number=${id}`,
+  PURCHASE: (id) => `/purchases/view?id=${id}`,
+  RETURN: (id) => `/returns?open=${id}`,
+  CUSTOMER: (id) => `/customers/view?id=${id}`,
   SETTINGS: () => "/settings",
 };
 

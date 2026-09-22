@@ -1,8 +1,11 @@
 "use client";
 
+import { Suspense } from "react";
+import { useQueryParam } from "@/hooks/use-query-param";
+
 import { AlertTriangle, Copy, ExternalLink, ImagePlus, Info, MoreHorizontal, Pencil, Printer, SearchX, Share2, Warehouse, Wrench } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -30,8 +33,8 @@ import { DamageDialog, PriceOverrideDialog, RackDialog } from "@/components/inve
 
 type Open = null | "price" | "rack" | "damage" | "photos" | "share";
 
-export default function InventoryDetailPage() {
-  const { sku } = useParams<{ sku: string }>();
+function InventoryDetailPageView() {
+  const sku = useQueryParam("sku");
   const key = decodeURIComponent(sku ?? "");
   const { data, loading } = useLive(() => getInventoryDetail(key), [key]);
 
@@ -83,7 +86,7 @@ function Detail({ detail }: { detail: InventoryDetail }) {
         }
         description={
           <>
-            <Link href={`/designs/${design.id}`} className="font-medium text-foreground hover:underline">
+            <Link href={`/designs/view?id=${design.id}`} className="font-medium text-foreground hover:underline">
               {design.name}
             </Link>{" "}
             · {detail.colour?.name} · {detail.fabric?.name} · received {formatDate(item.receivedAt)} ({detail.ageDays} days in stock)
@@ -231,7 +234,7 @@ function Detail({ detail }: { detail: InventoryDetail }) {
               <div className="divide-y">
                 <KeyValue label="SKU"><span className="font-mono">{item.sku}</span></KeyValue>
                 <KeyValue label="Design">
-                  <Link href={`/designs/${design.id}`} className="text-primary hover:underline">
+                  <Link href={`/designs/view?id=${design.id}`} className="text-primary hover:underline">
                     {design.name}
                   </Link>
                   <div className="text-xs font-normal text-muted-foreground">{design.code}</div>
@@ -328,7 +331,7 @@ function SalesHistory({ detail }: { detail: InventoryDetail }) {
           .map(({ orderItem, order }) => (
             <li key={orderItem.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5">
               <div className="min-w-0 flex-1">
-                <Link href={order ? `/orders/${order.number}` : "#"} className="font-medium text-primary hover:underline">
+                <Link href={order ? `/orders/view?number=${order.number}` : "#"} className="font-medium text-primary hover:underline">
                   Order #{order?.number ?? "?"}
                 </Link>
                 <div className="text-xs text-muted-foreground">
@@ -369,7 +372,7 @@ function PurchaseHistory({ detail, canSeeCost }: { detail: InventoryDetail; canS
     <Panel
       action={
         <Button asChild size="sm" variant="ghost">
-          <Link href={`/purchases/${purchase.id}`}>
+          <Link href={`/purchases/view?id=${purchase.id}`}>
             Open purchase <ExternalLink />
           </Link>
         </Button>
@@ -379,7 +382,7 @@ function PurchaseHistory({ detail, canSeeCost }: { detail: InventoryDetail; canS
       <div className="grid gap-x-8 sm:grid-cols-2">
         <div className="divide-y">
           <KeyValue label="Purchase">
-            <Link href={`/purchases/${purchase.id}`} className="text-primary hover:underline">
+            <Link href={`/purchases/view?id=${purchase.id}`} className="text-primary hover:underline">
               {purchase.number}
             </Link>
           </KeyValue>
@@ -415,5 +418,13 @@ function DetailSkeleton() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function InventoryDetailPage() {
+  return (
+    <Suspense>
+      <InventoryDetailPageView />
+    </Suspense>
   );
 }

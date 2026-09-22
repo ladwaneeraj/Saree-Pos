@@ -1,8 +1,11 @@
 "use client";
 
+import { Suspense } from "react";
+import { useQueryParam } from "@/hooks/use-query-param";
+
 import { CalendarClock, Heart, IndianRupee, Mail, MapPin, MessageCircle, Phone, ReceiptText, ShoppingBag, Users } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,8 +28,8 @@ import { getCustomerDetail, updateCustomer } from "@/services/customers";
 import { CHANNEL_LABELS } from "@/services/orders";
 import { useCan } from "@/stores/session";
 
-export default function CustomerProfilePage() {
-  const { id } = useParams<{ id: string }>();
+function CustomerProfilePageView() {
+  const id = useQueryParam("id");
   const router = useRouter();
   const { data } = useLive(() => getCustomerDetail(id), [id]);
 
@@ -98,7 +101,7 @@ export default function CustomerProfilePage() {
               columns={columns}
               rows={sorted}
               rowKey={(o) => o.id}
-              onRowClick={(o) => router.push(`/orders/${o.number}`)}
+              onRowClick={(o) => router.push(`/orders/view?number=${o.number}`)}
               mobileCard={(o) => (
                 <div className="space-y-1.5">
                   <div className="flex justify-between">
@@ -125,7 +128,7 @@ export default function CustomerProfilePage() {
             ) : (
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-6">
                 {data.wishlist.map((d) => (
-                  <Link key={d.id} href={`/designs/${d.id}`} className="group">
+                  <Link key={d.id} href={`/designs/view?id=${d.id}`} className="group">
                     <MediaImage id={d.imageIds[0]} alt={d.name} thumb className="transition-opacity group-hover:opacity-90" />
                     <div className="mt-1.5 truncate text-xs font-medium">{d.name}</div>
                     <div className="text-xs text-muted-foreground tabular">{formatINR(d.price)}</div>
@@ -227,5 +230,13 @@ function NotesCard({ customer }: { customer: Customer }) {
         <p className="text-sm whitespace-pre-wrap text-muted-foreground">{customer.notes || "No notes yet."}</p>
       )}
     </section>
+  );
+}
+
+export default function CustomerProfilePage() {
+  return (
+    <Suspense>
+      <CustomerProfilePageView />
+    </Suspense>
   );
 }

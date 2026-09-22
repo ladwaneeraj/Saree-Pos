@@ -90,7 +90,7 @@ export default function DashboardPage() {
                         <span className="absolute -top-1.5 -left-1.5 flex size-4.5 items-center justify-center rounded-full bg-foreground text-[10px] font-semibold text-background tabular">{ci * 5 + i + 1}</span>
                       </div>
                     ),
-                    label: <Link href={`/designs/${m.design.id}`} className="hover:underline">{m.design.name}</Link>,
+                    label: <Link href={`/designs/view?id=${m.design.id}`} className="hover:underline">{m.design.name}</Link>,
                     value: m.units,
                     display: `${formatNumber(m.units)} sold`,
                     hint: formatINRCompact(m.revenue),

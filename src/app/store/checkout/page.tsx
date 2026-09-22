@@ -80,7 +80,7 @@ export default function CheckoutPage() {
       });
       setStep(2);
       await wait(600);
-      router.replace(`/store/order/${order.id}`);
+      router.replace(`/store/order?id=${order.id}`);
     } catch (e) {
       setStep(null);
       toast.error(errorMessage(e));

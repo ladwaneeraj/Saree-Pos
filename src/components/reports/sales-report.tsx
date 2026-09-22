@@ -62,7 +62,7 @@ export function SalesReportView({ data, canSeeCost, rangeLabel }: { data: SalesR
             description="By net revenue in this period"
             rows={data?.topDesigns}
             rowKey={(r) => r.design.id}
-            onRowClick={(r) => router.push(`/designs/${r.design.id}`)}
+            onRowClick={(r) => router.push(`/designs/view?id=${r.design.id}`)}
             csv={{ filename: "top-designs", header: ["Design", "Code", "Units sold", "Revenue", "In stock"], row: (r) => [r.design.name, r.design.code, r.units, r.revenue, r.available] }}
             columns={[
               { key: "rank", header: "#", className: "w-8 text-muted-foreground tabular", cell: (r) => (data?.topDesigns.indexOf(r) ?? 0) + 1 },
