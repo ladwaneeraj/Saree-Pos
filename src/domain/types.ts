@@ -1,5 +1,5 @@
 /**
- * Domain model for VASRA.
+ * Domain model for Dhanvi Silks.
  *
  * Conventions:
  * - All money values are whole Indian Rupees (integers). Tax splits are derived at display time.

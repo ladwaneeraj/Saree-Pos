@@ -49,7 +49,7 @@ import type {
   WaMessageRepository,
   WishlistRepository,
 } from "../repositories";
-import type { VasraDatabase } from "./db";
+import type { ShopDatabase } from "./db";
 
 class DexieRepository<T extends { id: string }> implements Repository<T> {
   constructor(protected readonly table: Table<T, string>) {}
@@ -305,7 +305,7 @@ class DexieMessageRepository extends DexieRepository<WaMessage> implements WaMes
 }
 
 class DexieSettingsRepository implements SettingsRepository {
-  constructor(private readonly db: VasraDatabase) {}
+  constructor(private readonly db: ShopDatabase) {}
   async get<K extends SettingsKey>(key: K) {
     const row = await this.db.settings.get(key);
     return row?.value as AppSettings[K] | undefined;
@@ -316,7 +316,7 @@ class DexieSettingsRepository implements SettingsRepository {
 }
 
 class DexieCounterRepository implements CounterRepository {
-  constructor(private readonly db: VasraDatabase) {}
+  constructor(private readonly db: ShopDatabase) {}
   async next(key: string, count = 1) {
     const current = (await this.db.counters.get(key))?.value ?? 1;
     await this.db.counters.put({ key, value: current + count });
@@ -331,7 +331,7 @@ class DexieCounterRepository implements CounterRepository {
 }
 
 class DexieMetaRepository implements MetaRepository {
-  constructor(private readonly db: VasraDatabase) {}
+  constructor(private readonly db: ShopDatabase) {}
   async get<T extends string | number | boolean | null>(key: string) {
     return (await this.db.meta.get(key))?.value as T | undefined;
   }
@@ -340,7 +340,7 @@ class DexieMetaRepository implements MetaRepository {
   }
 }
 
-export function createDexieRepositories(db: VasraDatabase): Repositories {
+export function createDexieRepositories(db: ShopDatabase): Repositories {
   return {
     designs: new DexieDesignRepository(db.designs),
     inventory: new DexieInventoryRepository(db.inventoryItems),

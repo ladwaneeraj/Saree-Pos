@@ -28,13 +28,13 @@ export const DEFAULT_TEMPLATES: Record<NotificationEvent, string> = {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   business: {
-    name: "Anvaya Silks",
-    legalName: "Anvaya Silks & Textiles",
+    name: "Dhanvi Silks",
+    legalName: "Dhanvi Silks & Textiles",
     tagline: "Handpicked silks and handlooms",
     gstin: "29ABCPA1234K1Z5",
     phone: "+91 98450 21870",
     whatsapp: "+91 98450 21870",
-    email: "hello@anvayasilks.in",
+    email: "hello@dhanvisilks.in",
     address: "1st Floor, 214 Chamarajpet Main Road",
     city: "Davanagere",
     state: "Karnataka",
@@ -74,9 +74,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     showColour: true,
   },
   users: [
-    { id: "u-owner", name: "Ramesh Hegde", role: "OWNER", email: "ramesh@anvayasilks.in" },
-    { id: "u-manager", name: "Kavya Shetty", role: "MANAGER", email: "kavya@anvayasilks.in" },
-    { id: "u-billing", name: "Suresh Naik", role: "BILLING", email: "suresh@anvayasilks.in" },
-    { id: "u-packing", name: "Manjunath K", role: "PACKING", email: "manju@anvayasilks.in" },
+    { id: "u-owner", name: "Ramesh Hegde", role: "OWNER", email: "ramesh@dhanvisilks.in" },
+    { id: "u-manager", name: "Kavya Shetty", role: "MANAGER", email: "kavya@dhanvisilks.in" },
+    { id: "u-billing", name: "Suresh Naik", role: "BILLING", email: "suresh@dhanvisilks.in" },
+    { id: "u-packing", name: "Manjunath K", role: "PACKING", email: "manju@dhanvisilks.in" },
   ],
 };

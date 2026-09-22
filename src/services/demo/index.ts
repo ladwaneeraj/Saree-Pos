@@ -7,7 +7,7 @@ import { clearMediaCache } from "../media";
 import { generateDemoData } from "./seed";
 
 export const SEED_VERSION = 1;
-const EXPORT_FORMAT = "vasra-demo-export";
+const EXPORT_FORMAT = "dhanvi-silks-demo-export";
 
 export type SeedProgress = (stage: string) => void;
 
@@ -22,12 +22,19 @@ async function writeSeed(onProgress?: SeedProgress): Promise<void> {
   clearMediaCache();
 }
 
-/** Seeds on first launch. Returns true when data was created. */
-export async function ensureSeeded(onProgress?: SeedProgress): Promise<boolean> {
-  const seededAt = await repos().meta.get<number>("seededAt");
-  if (seededAt) return false;
-  await writeSeed(onProgress);
-  return true;
+let seeding: Promise<boolean> | null = null;
+
+/** Seeds on first launch. Returns true when data was created. Concurrent calls share one run. */
+export function ensureSeeded(onProgress?: SeedProgress): Promise<boolean> {
+  seeding ??= (async () => {
+    const seededAt = await repos().meta.get<number>("seededAt");
+    if (seededAt) return false;
+    await writeSeed(onProgress);
+    return true;
+  })().finally(() => {
+    seeding = null;
+  });
+  return seeding;
 }
 
 export async function getSeededAt(): Promise<number | null> {
@@ -57,7 +64,7 @@ export async function importDemoData(json: string): Promise<void> {
   } catch {
     throw new Error("This file is not valid JSON");
   }
-  if (parsed.format !== EXPORT_FORMAT || !parsed.tables) throw new Error("This file is not a VASRA demo export");
+  if (parsed.format !== EXPORT_FORMAT || !parsed.tables) throw new Error("This file is not a Dhanvi Silks demo export");
   await dataStore().importSnapshot(parsed.tables);
   clearMediaCache();
   await recordAudit({ action: "DATA_IMPORTED", entityType: "SYSTEM", entityId: "demo", entityLabel: "Demo data", summary: "Demo data imported from file", actor });

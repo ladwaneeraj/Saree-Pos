@@ -29,9 +29,9 @@ import type {
   WishlistEntry,
 } from "@/domain/types";
 
-export const DB_NAME = "vasra-demo";
+export const DB_NAME = "dhanvi-silks-demo";
 
-export class VasraDatabase extends Dexie {
+export class ShopDatabase extends Dexie {
   designs!: Table<Design, string>;
   inventoryItems!: Table<InventoryItem, string>;
   inventoryMovements!: Table<InventoryMovement, string>;
@@ -65,8 +65,8 @@ export class VasraDatabase extends Dexie {
     this.version(1).stores({
       designs: "id, &code, &slug, name, categoryId, fabricId, *collectionIds, createdAt",
       inventoryItems:
-        "id, &sku, designId, colourId, status, location, purchaseId, receivedAt, updatedAt, holderId, reservation.expiresAt, [designId+status]",
-      inventoryMovements: "id, itemId, type, refId, createdAt",
+        "id, &sku, designId, status, purchaseId, holderId, reservation.expiresAt, [designId+status]",
+      inventoryMovements: "id, itemId, createdAt",
       inventoryDrafts: "id, position",
       categories: "id, &slug",
       collections: "id, &slug",

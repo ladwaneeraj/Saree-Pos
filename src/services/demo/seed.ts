@@ -42,7 +42,7 @@ import { formatINR } from "@/lib/format";
 import { describeDesign } from "../catalog";
 import { DEFAULT_SETTINGS } from "../settings-defaults";
 import { renderTemplate } from "../notifications";
-import { foldedSareeSvg, palluSareeSvg, shade, type SareeArtSpec } from "./saree-art";
+import { PHOTOS, photoCredit, unsplashUrl } from "./stock-photos";
 import {
   CATEGORIES,
   CITIES,
@@ -56,7 +56,6 @@ import {
   SUPPLIERS,
   SURNAMES,
   WHATSAPP_SCRIPTS,
-  ZARI,
   type DesignSeed,
 } from "./seed-data";
 
@@ -115,20 +114,6 @@ class Rng {
     while (s.length < n) s += String(this.int(0, 9));
     return s;
   }
-}
-
-function rgb(hex: string): [number, number, number] {
-  const h = hex.replace("#", "");
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
-}
-function colourDistance(a: string, b: string): number {
-  const [r1, g1, b1] = rgb(a);
-  const [r2, g2, b2] = rgb(b);
-  return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
-}
-function colourLightness(hex: string): number {
-  const [r, g, b] = rgb(hex);
-  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 }
 
 const roundTo = (n: number, step: number) => Math.round(n / step) * step;
@@ -200,7 +185,6 @@ export function generateDemoData(now: number, origin: string): SeedTables {
   /* Designs and artwork --------------------------------------------- */
   const media: Media[] = [];
   const art = new Map<string, string[]>(); // `${designId}|${colourId}` -> media ids
-  const backdrops = ["#e9dfd2", "#e6ddd3", "#e4ddd6", "#ebe3d8", "#e2dcd6", "#e7e1d9"];
   const designs: Design[] = [];
   const seedByDesign = new Map<string, DesignSeed>();
   const priceChangedDesigns = new Map<string, { oldPrice: number; changedAt: number }>();
@@ -214,26 +198,28 @@ export function generateDemoData(now: number, origin: string): SeedTables {
     const blouse = !["Bengal Tant Cotton", "Semi Silk Daily Wear", "Kota Doria Printed"].includes(seed.name);
     const base = { pattern: seed.pattern, border: seed.border, lengthM: blouse ? 6.3 : 5.5, blouseIncluded: blouse };
     const imageIds: string[] = [];
-    seed.colours.forEach((colourName, ci) => {
-      const colour = colourByName.get(colourName)!;
-      // Keep the border/pallu visibly different from the body colour.
-      const accent = colourDistance(seed.accent, colour.hex) < 90 ? shade(colour.hex, colourLightness(colour.hex) > 0.55 ? -0.45 : 0.45) : seed.accent;
-      const spec: SareeArtSpec = {
-        body: colour.hex,
-        accent,
-        zari: ZARI[seed.zari],
-        motif: seed.motif,
-        palluMotif: seed.pallu,
-        border: seed.borderStyle,
-        backdrop: backdrops[(i + ci) % backdrops.length]!,
-      };
-      const folded = { id: `med_${i}_${ci}_a`, url: foldedSareeSvg(spec) };
-      const pallu = { id: `med_${i}_${ci}_b`, url: palluSareeSvg(spec) };
-      for (const m of [folded, pallu]) {
-        media.push({ id: m.id, kind: "GENERATED", mime: "image/svg+xml", url: m.url, thumbUrl: m.url, width: 480, height: 600, createdAt });
-      }
-      art.set(`${id}|${colour.id}`, [folded.id, pallu.id]);
-      if (ci === 0) imageIds.push(folded.id, pallu.id);
+    seed.looks.forEach((look, li) => {
+      const colour = colourByName.get(look.colour)!;
+      const ids = look.photos.map((key) => {
+        const mediaId = `med_${key}`;
+        if (!media.some((m) => m.id === mediaId)) {
+          const photo = PHOTOS[key];
+          media.push({
+            id: mediaId,
+            kind: "STOCK",
+            mime: "image/jpeg",
+            url: unsplashUrl(photo, { w: 1200, h: 1500 }),
+            thumbUrl: unsplashUrl(photo, { w: 400, h: 500, q: 65 }),
+            width: 1200,
+            height: 1500,
+            credit: photoCredit(photo),
+            createdAt,
+          });
+        }
+        return mediaId;
+      });
+      art.set(`${id}|${colour.id}`, ids);
+      if (li === 0) imageIds.push(...ids);
     });
     const design: Design = {
       id,
@@ -323,7 +309,7 @@ export function generateDemoData(now: number, origin: string): SeedTables {
       purchaseKey.set(key, purchase);
       purchases.push(purchase);
     }
-    const colourIds = lot.seed.colours.map((n) => colourByName.get(n)!.id);
+    const colourIds = lot.seed.looks.map((l) => colourByName.get(l.colour)!.id);
     const perColour = new Map<string, number>();
     for (let n = 0; n < lot.qty; n++) {
       const cid = rng.weighted(colourIds, (c) => colourIds.length - colourIds.indexOf(c) + 1);
@@ -407,7 +393,8 @@ export function generateDemoData(now: number, origin: string): SeedTables {
   for (const p of pieces) {
     const purchase = purchaseById.get(p.purchaseId!)!;
     move(p, "PURCHASED", purchase.date, { toStatus: "AVAILABLE", refType: "PURCHASE", refId: purchase.id, refLabel: purchase.number });
-    move(p, "RECEIVED", purchase.receivedAt!, { fromStatus: "AVAILABLE", toStatus: "AVAILABLE", note: `Shelved at ${p.location}` });
+    // Older stock keeps one movement to keep the seed light; recent receipts show the full trail.
+    if (now - purchase.receivedAt! < 60 * DAY) move(p, "RECEIVED", purchase.receivedAt!, { fromStatus: "AVAILABLE", toStatus: "AVAILABLE", note: `Shelved at ${p.location}` });
   }
 
   /* Customers --------------------------------------------------------- */
@@ -570,7 +557,7 @@ export function generateDemoData(now: number, origin: string): SeedTables {
     drafts.push({ channel, at, customer: null, items: [], fulfilment: channel === "SHOP" ? "IN_STORE" : "SHIPPING" });
   }
   // Scripted WhatsApp orders tied to conversations.
-  drafts.push({ channel: "WHATSAPP", at: now - 95 * 60_000, customer: null, items: [], fulfilment: "SHIPPING", forced: { designName: "Kanchipuram Floral Silk", colourName: "Wine" } });
+  drafts.push({ channel: "WHATSAPP", at: now - 95 * 60_000, customer: null, items: [], fulfilment: "SHIPPING", forced: { designName: "Kanchipuram Temple Border Silk", colourName: "Purple" } });
   drafts.push({ channel: "WHATSAPP", at: now - 3 * HOUR, customer: null, items: [], fulfilment: "SHIPPING", forced: { designName: "Chanderi Silk Cotton Butta", colourName: "Mint Green" } });
   drafts.sort((a, b) => a.at - b.at);
 
@@ -590,7 +577,7 @@ export function generateDemoData(now: number, origin: string): SeedTables {
       const colour = colourByName.get(draft.forced.colourName)!;
       const piece = sellable(design.id, draft.at).find((p) => p.colourId === colour.id) ?? sellable(design.id, draft.at)[0];
       draft.items = piece ? [piece] : [];
-      draft.customer = scriptedCustomers.get(draft.forced.designName === "Kanchipuram Floral Silk" ? "Lakshmi Prasad" : "Ananya Rao")!;
+      draft.customer = scriptedCustomers.get(draft.forced.designName === "Kanchipuram Temple Border Silk" ? "Lakshmi Prasad" : "Ananya Rao")!;
     } else {
       const count = rng.weighted([1, 2, 3], (n) => (n === 1 ? 72 : n === 2 ? 22 : 6));
       draft.items = pickItems(count, draft.at, draft.channel);
@@ -652,7 +639,7 @@ export function generateDemoData(now: number, origin: string): SeedTables {
     let paid = true;
     let cancelled = false;
     if (draft.channel === "SHOP") status = "DELIVERED";
-    else if (draft.forced?.designName === "Kanchipuram Floral Silk" || paymentPendingSet.has(draft)) {
+    else if (draft.forced?.designName === "Kanchipuram Temple Border Silk" || paymentPendingSet.has(draft)) {
       status = "PAYMENT_PENDING";
       paid = false;
     } else if (draft.forced) status = "RESERVED";

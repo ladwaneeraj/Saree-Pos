@@ -197,7 +197,7 @@ export async function createWhatsAppOrder(conversationId: string, input: WhatsAp
   });
 }
 
-export function upiLink(order: Order, payee: string, vpa = "anvayasilks@okhdfc"): string {
+export function upiLink(order: Order, payee: string, vpa = "dhanvisilks@okhdfc"): string {
   return `upi://pay?pa=${vpa}&pn=${encodeURIComponent(payee)}&am=${order.total}&cu=INR&tn=${encodeURIComponent(`Order ${order.number}`)}`;
 }
 

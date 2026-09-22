@@ -18,7 +18,7 @@ export const useShopper = create<ShopperState>()(
       active: "A",
       switchShopper: (to) => set({ active: to }),
     }),
-    { name: "vasra-shopper" },
+    { name: "dhanvi-shopper" },
   ),
 );
 

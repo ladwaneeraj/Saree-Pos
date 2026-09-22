@@ -18,7 +18,7 @@ export const useSession = create<SessionState>()(
       user: DEFAULT_SETTINGS.users[0]!,
       setUser: (user) => set({ user }),
     }),
-    { name: "vasra-session" },
+    { name: "dhanvi-session" },
   ),
 );
 

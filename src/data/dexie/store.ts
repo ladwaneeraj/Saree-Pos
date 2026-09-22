@@ -1,10 +1,10 @@
 import { liveQuery } from "dexie";
 import type { DataStore, Subscribable, TableSnapshot } from "../repositories";
-import { VasraDatabase } from "./db";
+import { ShopDatabase } from "./db";
 import { createDexieRepositories } from "./repositories";
 
 export function createDexieDataStore(): DataStore {
-  const db = new VasraDatabase();
+  const db = new ShopDatabase();
   const repos = createDexieRepositories(db);
 
   return {

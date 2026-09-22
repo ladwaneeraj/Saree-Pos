@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * VASRA design tokens.
+ * Dhanvi Silks design tokens.
  * Warm neutral surfaces, a deep wine primary and a restrained zari-gold accent.
  * Light theme only for the demo; every colour is a token so a dark theme can be added later.
  */
@@ -158,4 +158,9 @@
   body {
     background: white;
   }
+}
+
+@keyframes boot {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
 }
