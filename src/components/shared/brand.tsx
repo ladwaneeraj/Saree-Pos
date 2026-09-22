@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 /** Dhanvi Silks monogram: a serif D with a zari underline. */
 export function BrandMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 40 40" className={cn("size-8", className)} aria-hidden>
+    <svg viewBox="0 0 40 40" className={cn("size-8 shrink-0", className)} aria-hidden>
       <rect width="40" height="40" rx="11" className="fill-primary" />
       <path d="M13 10.5h7.2c6.1 0 10.3 3.9 10.3 9.4s-4.2 9.6-10.3 9.6H13z" fill="none" stroke="white" strokeWidth="3" strokeLinejoin="round" />
       <path d="M13 33h14" className="stroke-gold" strokeWidth="1.8" strokeLinecap="round" />
