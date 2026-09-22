@@ -611,3 +611,76 @@ export async function findItemIdsBySkus(skus: string[]): Promise<string[]> {
   const found = await Promise.all(skus.map((s) => repos().inventory.findBySku(s)));
   return found.filter((i): i is InventoryItem => !!i).map((i) => i.id);
 }
+
+/** Labels in the order requested, from SKUs or from every piece of a purchase batch. */
+export async function getLabelsFor(input: { skus?: string[]; purchaseId?: string }): Promise<LabelData[]> {
+  let ids: string[] = [];
+  if (input.skus?.length) ids = await findItemIdsBySkus(input.skus.map((s) => s.trim().toUpperCase()).filter(Boolean));
+  else if (input.purchaseId) {
+    const items = await repos().inventory.listByPurchase(input.purchaseId);
+    ids = items.sort((a, b) => a.sku.localeCompare(b.sku, "en", { numeric: true })).map((i) => i.id);
+  }
+  return ids.length ? getLabels(ids) : [];
+}
+
+/** Distinct racks / locations in use, for pickers. */
+export async function listLocations(): Promise<string[]> {
+  const items = await repos().inventory.list();
+  return [...new Set(items.map((i) => i.location))].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+}
+
+/* ------------------------------------------------------------------ */
+/* Designs with stock                                                  */
+/* ------------------------------------------------------------------ */
+
+export interface DesignSummary {
+  design: Design;
+  fabric: Fabric | undefined;
+  category: Category | undefined;
+  collectionNames: string[];
+  stock: DesignStock;
+  imageId: string | null;
+}
+
+export async function listDesignSummaries(): Promise<DesignSummary[]> {
+  const r = repos();
+  const [designs, items, catalog] = await Promise.all([r.designs.list(), r.inventory.list(), getCatalog()]);
+  const stock = summarizeStock(items);
+  return designs
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .map((design) => {
+      const s = stock.get(design.id) ?? emptyDesignStock(design.id);
+      return {
+        design,
+        fabric: catalog.fabricById.get(design.fabricId),
+        category: catalog.categoryById.get(design.categoryId),
+        collectionNames: design.collectionIds.map((id) => catalog.collectionById.get(id)?.name ?? "").filter(Boolean),
+        stock: s,
+        imageId: design.imageIds[0] ?? s.pieceImageIds[0] ?? null,
+      };
+    });
+}
+
+export interface DesignOverview extends DesignSummary {
+  pieces: InventoryRow[];
+}
+
+export async function getDesignOverview(designId: string): Promise<DesignOverview | null> {
+  const r = repos();
+  const design = await r.designs.get(designId);
+  if (!design) return null;
+  const [page, catalog] = await Promise.all([
+    searchInventory({ designId, status: "ALL", sortKey: "sku", sortDir: "asc", pageSize: Number.POSITIVE_INFINITY }),
+    getCatalog(),
+  ]);
+  const stock = summarizeStock(page.rows.map((row) => row.item)).get(designId) ?? emptyDesignStock(designId);
+  return {
+    design,
+    fabric: catalog.fabricById.get(design.fabricId),
+    category: catalog.categoryById.get(design.categoryId),
+    collectionNames: design.collectionIds.map((id) => catalog.collectionById.get(id)?.name ?? "").filter(Boolean),
+    stock,
+    imageId: design.imageIds[0] ?? stock.pieceImageIds[0] ?? null,
+    pieces: page.rows,
+  };
+}

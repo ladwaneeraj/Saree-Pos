@@ -255,3 +255,12 @@ export async function setDesignImages(designId: string, imageIds: string[]): Pro
     });
   });
 }
+
+export async function listDesigns(): Promise<Design[]> {
+  const designs = await repos().designs.list();
+  return designs.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export async function getDesign(designId: string): Promise<Design | null> {
+  return (await repos().designs.get(designId)) ?? null;
+}

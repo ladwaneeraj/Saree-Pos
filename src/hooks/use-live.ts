@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { dataStore } from "@/data";
 import { errorMessage } from "@/domain/errors";
 
@@ -18,11 +18,12 @@ export interface LiveResult<T> {
 export function useLive<T>(query: () => Promise<T>, deps: readonly unknown[]): LiveResult<T> {
   const [state, setState] = useState<LiveResult<T>>({ data: undefined, error: null, loading: true });
   const queryRef = useRef(query);
-  queryRef.current = query;
+  useLayoutEffect(() => {
+    queryRef.current = query;
+  });
 
   useEffect(() => {
     let active = true;
-    setState((s) => ({ ...s, loading: true }));
     const sub = dataStore()
       .observe(() => queryRef.current())
       .subscribe({

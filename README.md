@@ -1,14 +1,25 @@
-# Dhanvi Silks · Saree Commerce & Inventory (work in progress)
+# Dhanvi Silks · Saree Commerce & Inventory
 
-Frontend-only demo (Next.js 16, TypeScript, Tailwind, shadcn/ui, Zustand, Dexie/IndexedDB).
+Frontend-only SaaS demo for a saree shop. Next.js 16, React 19, TypeScript, Tailwind v4, shadcn/ui, Zustand, Dexie (IndexedDB), React Hook Form, Zod, Recharts.
 
-## Status
-Done: domain model and business rules, Dexie schema and repositories, application services, demo seed generator.
-Done: admin shell (sidebar, role switcher, global search `/`, shortcuts, demo badge, customer message outbox), Inventory list page, real Unsplash photos in the seed (needs internet).
-Not started: remaining screens (dashboard, POS, orders, WhatsApp, dispatch, returns, designs, purchases, customers, reports, settings, labels, store, tracking), end-to-end tests.
+## Run
+```
+npm install
+npm run dev        # http://localhost:3000
+```
+First launch seeds ~10,600 sarees, 1,800+ orders, customers, suppliers and WhatsApp chats into IndexedDB (a few seconds). Settings > Demo data resets it relative to today.
 
-Run: `npm install` then `npm run dev`, open http://localhost:3000/inventory. First launch seeds ~10,800 sarees into IndexedDB (a few seconds).
+Seeded product photos load from Unsplash (free licence), so the demo machine needs internet. Photos staff upload are stored locally.
 
-## Layers
+## Where things are
+- Admin: /dashboard, /inventory (quick add, bulk photo entry, labels), /designs, /purchases (+ Excel/CSV import), /pos, /orders, /whatsapp, /dispatch, /returns, /customers, /reports, /activity, /settings
+- Customer store: /store, tracking: /track/<orderId>
+- Switch demo user/role from the bottom of the sidebar. Shortcuts: / search, N new order, P POS, I inventory.
+
+## Architecture
 UI → hooks (`src/hooks`) → services (`src/services`) → repository interfaces (`src/data/repositories.ts`) → Dexie (`src/data/dexie`) → IndexedDB.
-Swap `createDexieDataStore` in `src/data/index.ts` for an API-backed store to move to a backend.
+Swap `createDexieDataStore` in `src/data/index.ts` for an API-backed store to move to a backend without touching the UI.
+
+## Notes
+- GST defaults to 5% inclusive (Settings > Tax). Confirm rates with your CA.
+- Barcodes encode the SKU only. Price changes never need label reprints, and past orders keep the price they were sold at.

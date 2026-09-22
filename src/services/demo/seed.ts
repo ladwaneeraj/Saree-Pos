@@ -1043,7 +1043,76 @@ export function generateDemoData(now: number, origin: string): SeedTables {
     const design = designById.get(p.designId)!;
     audit({ action: "PRICE_CHANGED", entityType: "INVENTORY", entityId: p.id, entityLabel: p.sku, summary: `Price ${formatINR(design.price)} → ${formatINR(p.priceOverride!)}`, before: formatINR(design.price), after: formatINR(p.priceOverride!), actorName: managerName, actorRole: "MANAGER", createdAt: p.receivedAt + DAY });
   }
+  // Recent day-to-day activity so the log reads like a working shop.
+  const roleOf = (name: string) => (name === ownerName ? "OWNER" : name === managerName ? "MANAGER" : name === billingName ? "BILLING" : name === packingName ? "PACKING" : "SYSTEM");
+  const recentOrders = orders.filter((o) => now - o.createdAt < 4 * DAY);
+  for (const o of recentOrders) {
+    const actorName = o.createdBy;
+    audit({ action: "ORDER_CREATED", entityType: "ORDER", entityId: o.id, entityLabel: `#${o.number}`, summary: `${o.channel === "SHOP" ? "Counter bill" : o.channel === "WHATSAPP" ? "WhatsApp order" : "Website order"} for ${o.customer.name} · ${formatINR(o.total)}`, before: null, after: null, actorName, actorRole: roleOf(actorName), createdAt: o.createdAt });
+    for (const ev of o.timeline.slice(1)) {
+      if (!ev.status || ev.at <= o.createdAt || ev.status === "CANCELLED") continue;
+      const isPayment = ev.status === "CONFIRMED" && o.channel !== "SHOP";
+      audit({
+        action: isPayment ? "PAYMENT_RECORDED" : "ORDER_STATUS_CHANGED",
+        entityType: "ORDER",
+        entityId: o.id,
+        entityLabel: `#${o.number}`,
+        summary: isPayment ? `Payment of ${formatINR(o.total)} received` : ev.label,
+        before: null,
+        after: null,
+        actorName: ev.actorName,
+        actorRole: roleOf(ev.actorName),
+        createdAt: ev.at,
+      });
+    }
+  }
+  for (const r of returns.slice(-6)) {
+    audit({ action: "RETURN_UPDATED", entityType: "RETURN", entityId: r.id, entityLabel: r.number, summary: `${r.type === "EXCHANGE" ? "Exchange" : "Return"} requested for order #${r.orderNumber}: ${r.reason}`, before: null, after: r.status, actorName: r.customerName, actorRole: "SYSTEM", createdAt: r.createdAt });
+  }
+  for (const item of pieces.filter((p) => p.status === "DAMAGED").slice(0, 6)) {
+    audit({ action: "INVENTORY_ADJUSTED", entityType: "INVENTORY", entityId: item.id, entityLabel: item.sku, summary: "Marked damaged during stock check", before: "Available", after: "Damaged", actorName: managerName, actorRole: "MANAGER", createdAt: item.updatedAt });
+  }
+  const recentPriceItems = pieces.filter((p) => p.status === "AVAILABLE" && p.priceOverride === null).slice(-40, -34);
+  recentPriceItems.forEach((p, i) => {
+    const design = designById.get(p.designId)!;
+    const newPrice = priceEnding(design.price * 0.94);
+    if (newPrice >= design.price || newPrice <= p.cost) return;
+    p.priceOverride = newPrice;
+    audit({ action: "PRICE_CHANGED", entityType: "INVENTORY", entityId: p.id, entityLabel: p.sku, summary: "Individual price set for this piece", before: formatINR(design.price), after: formatINR(newPrice), actorName: managerName, actorRole: "MANAGER", createdAt: now - (i * 7 + 3) * HOUR });
+  });
   auditLogs.sort((a, b) => a.createdAt - b.createdAt);
+
+  // A few heirloom designs are down to their last piece, so "Only 1 available" and
+  // "reserved in another cart" can be shown without any setup.
+  const lastPieceDesigns = new Set(["Banarasi Bridal Kadhwa", "Patola Double Ikat Silk", "Kanchipuram Half and Half"].map((n) => `dsn_${slugify(n)}`));
+  const removed = new Set<string>();
+  for (const designId of lastPieceDesigns) {
+    const available = pieces.filter((p) => p.designId === designId && p.status === "AVAILABLE");
+    for (const p of available.slice(1)) removed.add(p.id);
+  }
+  if (removed.size) {
+    for (let i = pieces.length - 1; i >= 0; i--) if (removed.has(pieces[i]!.id)) pieces.splice(i, 1);
+    for (let i = movements.length - 1; i >= 0; i--) if (removed.has(movements[i]!.itemId)) movements.splice(i, 1);
+    const perLine = new Map<string, { qty: number; cost: number }>();
+    for (const p of pieces) {
+      const key = `${p.purchaseId}|${p.designId}|${p.colourId}`;
+      const e = perLine.get(key) ?? { qty: 0, cost: 0 };
+      e.qty++;
+      e.cost += p.cost;
+      perLine.set(key, e);
+    }
+    for (let i = purchaseItems.length - 1; i >= 0; i--) {
+      const li = purchaseItems[i]!;
+      const e = perLine.get(`${li.purchaseId}|${li.designId}|${li.colourId}`);
+      if (!e) purchaseItems.splice(i, 1);
+      else li.quantity = e.qty;
+    }
+    for (const pur of purchases) {
+      const own = pieces.filter((p) => p.purchaseId === pur.id);
+      pur.pieceCount = own.length;
+      pur.totalCost = own.reduce((sum, p) => sum + p.cost, 0);
+    }
+  }
 
   return {
     categories,

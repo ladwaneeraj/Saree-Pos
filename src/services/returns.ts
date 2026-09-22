@@ -231,6 +231,7 @@ export interface ExchangeCandidate {
   designName: string;
   colourName: string;
   price: number;
+  imageId: string | null;
 }
 
 export async function findExchangeCandidates(q: string): Promise<ExchangeCandidate[]> {
@@ -241,7 +242,13 @@ export async function findExchangeCandidates(q: string): Promise<ExchangeCandida
   return items
     .map((item) => {
       const design = designById.get(item.designId)!;
-      return { item, designName: design.name, colourName: catalog.colourById.get(item.colourId)?.name ?? "", price: effectivePrice(item, design) };
+      return {
+        item,
+        designName: design.name,
+        colourName: catalog.colourById.get(item.colourId)?.name ?? "",
+        price: effectivePrice(item, design),
+        imageId: item.imageIds[0] ?? design.imageIds[0] ?? null,
+      };
     })
     .filter((c) => !needle || `${c.item.sku} ${c.designName} ${c.colourName}`.toLowerCase().includes(needle))
     .slice(0, 30);

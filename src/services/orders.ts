@@ -467,3 +467,9 @@ export async function getOrderDetail(idOrNumber: string): Promise<OrderDetail | 
     customer,
   };
 }
+
+/** Customer messages recorded for an order at or after `since`, oldest first. Used to echo them in toasts. */
+export async function orderNotificationsSince(orderId: string, since: number): Promise<Notification[]> {
+  const list = await repos().notifications.listByOrder(orderId);
+  return list.filter((n) => n.createdAt >= since).sort((a, b) => a.createdAt - b.createdAt);
+}

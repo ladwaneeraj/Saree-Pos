@@ -188,3 +188,52 @@ export async function completePosSale(input: PosSaleInput): Promise<Order> {
     return order;
   });
 }
+
+export interface ScanSample {
+  item: InventoryItem;
+  designName: string;
+  colourName: string;
+  price: number;
+  blockedReason: string | null;
+}
+
+/** Demo helper for the "Simulate scan" dialog: a few sellable labels plus some that must be refused. */
+export async function getScanSamples(limit = 6): Promise<ScanSample[]> {
+  const r = repos();
+  const [items, designs, catalog] = await Promise.all([r.inventory.list(), r.designs.list(), getCatalog()]);
+  const designById = new Map(designs.map((d) => [d.id, d]));
+  const t = now();
+  const toSample = (item: InventoryItem): ScanSample[] => {
+    const design = designById.get(item.designId);
+    if (!design) return [];
+    return [{
+      item,
+      designName: design.name,
+      colourName: catalog.colourById.get(item.colourId)?.name ?? "",
+      price: effectivePrice(item, design),
+      blockedReason: unavailableReason(item, t),
+    }];
+  };
+  const seen = new Set<string>();
+  const available = items
+    .filter((i) => isAvailableNow(i, t))
+    .sort((a, b) => a.receivedAt - b.receivedAt)
+    .filter((i) => (seen.has(i.designId) ? false : (seen.add(i.designId), true)))
+    .slice(0, limit)
+    .flatMap(toSample);
+  const blocked = [
+    items.find((i) => i.status === "RESERVED" && i.reservation?.kind === "CART" && !isHeldBy(i, POS_TERMINAL_ID, t)),
+    items.find((i) => i.status === "SOLD"),
+    items.find((i) => i.status === "DAMAGED"),
+  ].filter((i): i is InventoryItem => !!i).slice(0, 2).flatMap(toSample);
+  return [...available, ...blocked];
+}
+
+/** Sends (simulated) the bill to the customer after a counter sale. */
+export async function sendPosReceipt(orderId: string): Promise<void> {
+  assertPermission(currentActor(), "pos:use");
+  const order = await repos().orders.get(orderId);
+  if (!order) throw new DomainError("Order not found");
+  if (!order.customer.phone) throw new DomainError("Add the customer's mobile number to send the bill");
+  await notify("PAYMENT_RECEIVED", { order });
+}

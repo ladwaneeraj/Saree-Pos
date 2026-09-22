@@ -125,6 +125,16 @@ function inStock(items: InventoryItem[]): InventoryItem[] {
 /* Dashboard                                                           */
 /* ------------------------------------------------------------------ */
 
+export interface LowStockRow {
+  design: Design;
+  colourName: string;
+  colourHex: string;
+  available: number;
+  /** Pieces of this design and colour sold in the last 30 days. */
+  units: number;
+  imageId: string | null;
+}
+
 export interface DashboardData {
   kpis: {
     todaySales: number;
@@ -153,7 +163,8 @@ export interface DashboardData {
     readyToDispatch: Order[];
     returnRequests: Order[];
   };
-  lowStock: DesignMetric[];
+  lowStock: LowStockRow[];
+  lowStockThreshold: number;
   fastMoving: DesignMetric[];
   oldStock: { design: Design; pieces: number; oldestDays: number; cost: number; imageId: string | null }[];
 }
@@ -186,16 +197,33 @@ export async function getDashboard(): Promise<DashboardData> {
   const byStatus = (statuses: Order["status"][]) => pendingOrders.filter((o) => statuses.includes(o.status)).sort((a, b) => a.createdAt - b.createdAt);
 
   const metrics30 = designMetrics(lines, designById, availableByDesign);
-  const lowStock = designs
-    .filter((d) => d.isPublished)
-    .map((d) => ({
-      design: d,
-      available: availableByDesign.get(d.id) ?? 0,
-      units: metrics30.find((m) => m.design.id === d.id)?.units ?? 0,
-      revenue: 0,
-      imageId: d.imageIds[0] ?? null,
-    }))
-    .filter((m) => m.available <= settings.store.lowStockThreshold && (m.available > 0 || m.units > 0))
+  // Low stock is tracked per design and colour: that is how staff reorder ("wine Kanchipuram is down to 2").
+  const soldByDesignColour = new Map<string, number>();
+  for (const l of lines) soldByDesignColour.set(`${l.item.designId}|${l.item.colourName}`, (soldByDesignColour.get(`${l.item.designId}|${l.item.colourName}`) ?? 0) + 1);
+  const availableByDesignColour = new Map<string, number>();
+  for (const i of available) availableByDesignColour.set(`${i.designId}|${i.colourId}`, (availableByDesignColour.get(`${i.designId}|${i.colourId}`) ?? 0) + 1);
+  const combos = new Set([...availableByDesignColour.keys()]);
+  for (const l of lines) {
+    const colour = catalog.colours.find((c) => c.name === l.item.colourName);
+    if (colour) combos.add(`${l.item.designId}|${colour.id}`);
+  }
+  const lowStock: LowStockRow[] = [...combos]
+    .map((key): LowStockRow | null => {
+      const [designId, colourId] = key.split("|") as [string, string];
+      const design = designById.get(designId);
+      const colour = catalog.colourById.get(colourId);
+      if (!design || !colour || !design.isPublished) return null;
+      return {
+        design,
+        colourName: colour.name,
+        colourHex: colour.hex,
+        available: availableByDesignColour.get(key) ?? 0,
+        units: soldByDesignColour.get(`${designId}|${colour.name}`) ?? 0,
+        imageId: design.imageIds[0] ?? null,
+      };
+    })
+    // Selling colours with the fewest pieces left, plus anything under the low stock threshold.
+    .filter((m): m is LowStockRow => !!m && (m.units > 0 || (m.available > 0 && m.available <= settings.store.lowStockThreshold)))
     .sort((a, b) => a.available - b.available || b.units - a.units)
     .slice(0, 8);
 
@@ -246,6 +274,7 @@ export async function getDashboard(): Promise<DashboardData> {
       returnRequests: byStatus(["RETURN_REQUESTED"]),
     },
     lowStock,
+    lowStockThreshold: settings.store.lowStockThreshold,
     fastMoving: [...metrics30].sort((a, b) => b.units - a.units).slice(0, 6),
     oldStock: [...old.values()].sort((a, b) => b.cost - a.cost).slice(0, 6),
   };
@@ -411,8 +440,9 @@ export async function getInventoryReport(): Promise<InventoryReport> {
     fastMoving: fast,
     slowMoving: [...slowMap.values()]
       .map((s) => ({ design: s.design, available: s.available, unitsSold90d: sold90.get(s.design.id) ?? 0, avgAgeDays: Math.round(s.ageSum / s.available), cost: s.cost }))
-      .filter((s) => s.unitsSold90d <= 1 && s.avgAgeDays > 45)
-      .sort((a, b) => b.cost - a.cost)
+      // Under 5% of the shelf sold in 90 days and the stock is no longer fresh.
+      .filter((s) => s.unitsSold90d / (s.unitsSold90d + s.available) < 0.05 && s.avgAgeDays > 45)
+      .sort((a, b) => a.unitsSold90d / (a.unitsSold90d + a.available) - b.unitsSold90d / (b.unitsSold90d + b.available) || b.cost - a.cost)
       .slice(0, 15),
   };
 }

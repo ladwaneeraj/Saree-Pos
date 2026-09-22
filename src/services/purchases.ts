@@ -21,6 +21,24 @@ export async function listPurchases(): Promise<PurchaseRow[]> {
     .map((purchase) => ({ purchase, supplier: catalog.supplierById.get(purchase.supplierId) }));
 }
 
+export interface DesignOption {
+  id: string;
+  name: string;
+  code: string;
+  fabricId: string;
+  mrp: number;
+  price: number;
+  imageId: string | null;
+}
+
+/** Lightweight design list for purchase line pickers. */
+export async function listDesignOptions(): Promise<DesignOption[]> {
+  const designs = await repos().designs.list();
+  return designs
+    .map((d) => ({ id: d.id, name: d.name, code: d.code, fabricId: d.fabricId, mrp: d.mrp, price: d.price, imageId: d.imageIds[0] ?? null }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export interface PurchaseDetail {
   purchase: Purchase;
   supplier: Supplier | undefined;

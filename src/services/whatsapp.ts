@@ -8,6 +8,7 @@ import { DomainError } from "@/domain/errors";
 import { assertPermission } from "@/domain/permissions";
 import { isValidIndianMobile, normalizePhone } from "@/domain/rules/customers";
 import { effectivePrice } from "@/domain/rules/pricing";
+import { isAvailableNow } from "@/domain/rules/inventory";
 import { newId } from "@/lib/id";
 import { formatDateTime, formatINR } from "@/lib/format";
 import { currentActor, now } from "./context";
@@ -59,7 +60,39 @@ export async function getConversation(conversationId: string) {
     r.orders.getMany(conversation.orderIds),
     conversation.customerId ? r.customers.get(conversation.customerId) : Promise.resolve(undefined),
   ]);
-  return { conversation, messages, held, orders: orders.sort((a, b) => b.createdAt - a.createdAt), customer };
+  const products = await liveProductCards([...new Set(messages.flatMap((m) => (m.designId ? [m.designId] : [])))]);
+  return { conversation, messages, held, orders: orders.sort((a, b) => b.createdAt - a.createdAt), customer, products };
+}
+
+export interface WaProductCard {
+  designId: string;
+  name: string;
+  slug: string;
+  imageId: string | null;
+  /** Lowest price among pieces that can be sold right now (design price when none). */
+  price: number;
+  available: number;
+}
+
+/** Product cards in a chat always show today's price and stock, not the values when they were sent. */
+async function liveProductCards(designIds: string[]): Promise<Record<string, WaProductCard>> {
+  if (designIds.length === 0) return {};
+  const r = repos();
+  const t = now();
+  const designs = await r.designs.getMany(designIds);
+  const out: Record<string, WaProductCard> = {};
+  for (const design of designs) {
+    const sellable = (await r.inventory.listByDesign(design.id)).filter((i) => isAvailableNow(i, t));
+    out[design.id] = {
+      designId: design.id,
+      name: design.name,
+      slug: design.slug,
+      imageId: design.imageIds[0] ?? sellable.find((i) => i.imageIds.length)?.imageIds[0] ?? null,
+      price: sellable.length ? Math.min(...sellable.map((i) => effectivePrice(i, design))) : design.price,
+      available: sellable.length,
+    };
+  }
+  return out;
 }
 
 export async function markConversationRead(conversationId: string): Promise<void> {
@@ -197,7 +230,10 @@ export async function createWhatsAppOrder(conversationId: string, input: WhatsAp
   });
 }
 
-export function upiLink(order: Order, payee: string, vpa = "dhanvisilks@okhdfc"): string {
+/** Demo UPI ID of the shop. A real deployment reads this from payment settings. */
+export const SHOP_UPI_ID = "dhanvisilks@okhdfc";
+
+export function upiLink(order: Order, payee: string, vpa = SHOP_UPI_ID): string {
   return `upi://pay?pa=${vpa}&pn=${encodeURIComponent(payee)}&am=${order.total}&cu=INR&tn=${encodeURIComponent(`Order ${order.number}`)}`;
 }
 

@@ -136,22 +136,22 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="no-print sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/85 px-3 backdrop-blur sm:px-5">
+      <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
+        <header className="no-print sticky top-0 z-30 flex h-14 min-w-0 items-center gap-1 border-b sm:gap-2 bg-background/85 px-3 backdrop-blur sm:px-5">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setNavOpen(true)} aria-label="Open menu">
             <Menu />
           </Button>
-          <div className="lg:hidden"><BrandLockup compact /></div>
+          <div className="hidden shrink-0 sm:block lg:hidden"><BrandLockup compact /></div>
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            className="ml-1 flex h-9 w-full max-w-md items-center gap-2 rounded-lg border bg-card px-3 text-sm text-muted-foreground shadow-xs hover:border-primary/30"
+            className="ml-1 flex h-9 w-full min-w-0 max-w-md items-center gap-2 rounded-lg border bg-card px-3 text-sm text-muted-foreground shadow-xs hover:border-primary/30"
           >
             <Search className="size-4" />
             <span className="flex-1 truncate text-left">Search SKU, orders, customers…</span>
             <Kbd className="hidden sm:inline-flex">/</Kbd>
           </button>
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             <div className="hidden sm:block"><DemoBadge /></div>
             <Button variant="ghost" size="icon" className="hidden sm:inline-flex" onClick={() => setHelpOpen(true)} aria-label="Keyboard shortcuts">
               <Keyboard />

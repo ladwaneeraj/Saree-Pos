@@ -183,6 +183,8 @@ export interface StoreProductDetail extends StoreProduct {
   similar: StoreProduct[];
   reviews: Review[];
   scarcityThreshold: number;
+  /** Pieces currently held in someone's cart or on a counter/WhatsApp hold (not expired). */
+  reservedCount: number;
 }
 
 export async function getStoreProduct(slug: string): Promise<StoreProductDetail | null> {
@@ -191,13 +193,27 @@ export async function getStoreProduct(slug: string): Promise<StoreProductDetail 
   if (!product) return null;
   const candidates = products.filter((p) => p.available > 0).map((p) => p.design);
   const similar = rankSimilar(product.design, candidates, 8).map((d) => bySlug.get(d.slug)!).filter(Boolean);
+  const t = now();
+  const pieces = await repos().inventory.listByDesign(product.design.id);
+  const reservedCount = pieces.filter((i) => i.status === "RESERVED" && i.reservation?.kind !== "ORDER" && !isAvailableNow(i, t)).length;
   return {
+    reservedCount,
     ...product,
     fabricCare: catalog.fabricById.get(product.design.fabricId)?.care ?? "",
     similar,
     reviews: await repos().reviews.listByDesign(product.design.id),
     scarcityThreshold: settings.store.scarcityThreshold,
   };
+}
+
+/** Saved designs for a shopper with live availability, newest saved first. */
+export async function getShopperWishlist(ownerId: string): Promise<StoreProduct[]> {
+  const [{ products }, entries] = await Promise.all([loadStoreData(), repos().wishlists.listByOwner(ownerId)]);
+  const byDesign = new Map(products.map((p) => [p.design.id, p]));
+  return entries
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map((e) => byDesign.get(e.designId))
+    .filter((p): p is StoreProduct => Boolean(p));
 }
 
 /* ------------------------------------------------------------------ */
