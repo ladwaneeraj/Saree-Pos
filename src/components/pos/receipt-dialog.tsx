@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { balanceDue } from "@/domain/rules/payments";
 import { downloadInvoicePdf, saveInvoicePdf } from "@/services/invoices";
+import { printNode } from "@/lib/print";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,12 +19,8 @@ import { formatDateTime, formatINR, formatINRPaise } from "@/lib/format";
 import { getOrderDetail, PAYMENT_METHOD_LABELS } from "@/services/orders";
 import { sendPosReceipt } from "@/services/pos";
 
-const PRINT_CSS = `@media print {
-  body * { visibility: hidden !important; }
-  #pos-receipt, #pos-receipt * { visibility: visible !important; }
-  [data-slot=dialog-content] { transform: none !important; left: 0 !important; top: 0 !important; border: 0 !important; box-shadow: none !important; }
-  #pos-receipt { position: fixed; left: 0; top: 0; width: 80mm; padding: 0; }
-}`;
+/** Thermal roll: 80 mm wide, height follows content. */
+const RECEIPT_PAGE_CSS = "@page{size:80mm auto;margin:3mm}#pos-receipt{max-width:none!important;width:74mm;box-shadow:none!important;border-radius:0!important}";
 
 export function ReceiptDialog({ order, onNewSale }: { order: Order | null; onNewSale: () => void }) {
   const settings = useSettings();
@@ -34,6 +31,8 @@ export function ReceiptDialog({ order, onNewSale }: { order: Order | null; onNew
   const b = settings?.business;
   const tax = data ? splitInclusiveTax(data.order.total - data.order.shippingFee, data.order.taxRate) : null;
   const download = useAction(downloadInvoicePdf, { success: "Invoice PDF downloaded" });
+  const receiptRef = useRef<HTMLDivElement>(null);
+  const print = () => receiptRef.current && printNode(receiptRef.current, `Bill #${order?.number ?? ""}`, RECEIPT_PAGE_CSS);
   const due = data ? balanceDue(data.order) : 0;
 
   // Every completed sale gets its PDF stored right away, so the bill exists even if nobody clicks anything.
@@ -47,7 +46,6 @@ export function ReceiptDialog({ order, onNewSale }: { order: Order | null; onNew
   return (
     <Dialog open={!!order} onOpenChange={(o) => !o && onNewSale()}>
       <DialogContent className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
-        <style>{PRINT_CSS}</style>
         <DialogHeader className="no-print items-center border-b px-6 pt-6 pb-5 text-center sm:text-center">
           <div className="mb-1 flex size-12 items-center justify-center rounded-full bg-success-soft text-success"><CheckCircle2 className="size-7" /></div>
           <DialogTitle className="text-xl">Sale completed</DialogTitle>
@@ -62,7 +60,7 @@ export function ReceiptDialog({ order, onNewSale }: { order: Order | null; onNew
           {!data || !b || !tax ? (
             <Skeleton className="h-80 rounded-lg" />
           ) : (
-            <div id="pos-receipt" className="mx-auto max-w-[320px] rounded-lg bg-white px-5 py-5 font-mono text-[12px] leading-relaxed text-black shadow-sm">
+            <div id="pos-receipt" ref={receiptRef} className="mx-auto max-w-[320px] rounded-lg bg-white px-5 py-5 font-mono text-[12px] leading-relaxed text-black shadow-sm">
               <div className="text-center">
                 <div className="font-sans text-base font-semibold">{b.name}</div>
                 <div>{b.address}, {b.city} {b.pincode}</div>
@@ -114,7 +112,7 @@ export function ReceiptDialog({ order, onNewSale }: { order: Order | null; onNew
             <p className="text-xs text-muted-foreground">Walk-in sale. Add a customer next time to send the bill on WhatsApp.</p>
           )}
           <div className="grid grid-cols-4 gap-2">
-            <Button variant="outline" onClick={() => window.print()} disabled={!data}><Printer /> Print</Button>
+            <Button variant="outline" onClick={print} disabled={!data}><Printer /> Print</Button>
             <Button variant="outline" onClick={() => order && download.run(order.id)} disabled={!data || download.pending}><Download /> PDF</Button>
             <Button variant="outline" asChild>
               <Link href={order ? `/orders/view?number=${order.number}` : "#"}><ExternalLink /> Order</Link>

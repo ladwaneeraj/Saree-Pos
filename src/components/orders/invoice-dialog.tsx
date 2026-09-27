@@ -15,23 +15,7 @@ import type { InvoiceModel } from "@/lib/invoice-pdf";
 import { downloadInvoicePdf, getStoredInvoice, invoiceModel, saveInvoicePdf } from "@/services/invoices";
 import type { OrderDetail } from "@/services/orders";
 import { UpiQr } from "@/components/shared/upi-qr";
-
-/** Prints only the invoice node, in a hidden frame that reuses the app's stylesheets. */
-function printNode(node: HTMLElement, title: string): void {
-  const frame = document.createElement("iframe");
-  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
-  document.body.appendChild(frame);
-  const doc = frame.contentDocument!;
-  const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).map((n) => n.outerHTML).join("");
-  doc.open();
-  doc.write(`<!doctype html><html><head><title>${title}</title>${styles}<style>@page{size:A4;margin:12mm}body{background:#fff}</style></head><body>${node.outerHTML}</body></html>`);
-  doc.close();
-  setTimeout(() => {
-    frame.contentWindow?.focus();
-    frame.contentWindow?.print();
-    setTimeout(() => frame.remove(), 1000);
-  }, 500);
-}
+import { printNode } from "@/lib/print";
 
 export function InvoiceDialog({ detail, open, onOpenChange }: { detail: OrderDetail; open: boolean; onOpenChange: (open: boolean) => void }) {
   const settings = useSettings();
