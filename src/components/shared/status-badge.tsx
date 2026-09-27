@@ -54,7 +54,7 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
   return <Pill tone={ORDER_TONE[status]}>{ORDER_STATUS_LABELS[status]}</Pill>;
 }
 
-const PAYMENT_TONE: Record<PaymentStatus, Tone> = { PENDING: "warning", PAID: "success", PARTIALLY_REFUNDED: "info", REFUNDED: "neutral" };
+const PAYMENT_TONE: Record<PaymentStatus, Tone> = { PENDING: "warning", PARTIAL: "warning", PAID: "success", PARTIALLY_REFUNDED: "info", REFUNDED: "neutral" };
 
 export function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   return <Pill tone={PAYMENT_TONE[status]}>{PAYMENT_STATUS_LABELS[status]}</Pill>;

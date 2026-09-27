@@ -115,11 +115,133 @@ export async function ensureCollection(name: string): Promise<Collection> {
   return collection;
 }
 
-export async function createSupplier(input: Omit<Supplier, "id" | "createdAt">): Promise<Supplier> {
+export async function createSupplier(input: Omit<Supplier, "id" | "createdAt" | "code"> & { code?: string }): Promise<Supplier> {
   if (!input.name.trim()) throw new DomainError("Supplier name is required");
-  const supplier: Supplier = { ...input, name: input.name.trim(), id: newId("sup"), createdAt: now() };
+  const supplier: Supplier = { ...input, name: input.name.trim(), code: supplierCode(input.code, input.name), id: newId("sup"), createdAt: now() };
   await repos().suppliers.add(supplier);
   return supplier;
+}
+
+/** Explicit code, else the initials of the name ("Sri Kamakshi Silk Weavers" → "SKS"). */
+export function supplierCode(code: string | undefined, name: string): string {
+  const explicit = (code ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  if (explicit) return explicit.slice(0, 6);
+  return name.trim().split(/\s+/).map((w) => w[0] ?? "").join("").toUpperCase().slice(0, 3);
+}
+
+export async function updateSupplier(id: string, changes: Partial<Omit<Supplier, "id" | "createdAt">>): Promise<void> {
+  assertPermission(currentActor(), "purchases:manage");
+  await transaction(async () => {
+    const supplier = await repos().suppliers.get(id);
+    if (!supplier) throw new DomainError("Supplier not found");
+    const next = { ...changes };
+    if (next.name !== undefined && !next.name.trim()) throw new DomainError("Supplier name is required");
+    if (next.code !== undefined) next.code = supplierCode(next.code, next.name ?? supplier.name);
+    await repos().suppliers.update(id, next);
+  });
+}
+
+/** Finds a supplier by GSTIN, then by name. Used when a scanned bill names the supplier. */
+export async function findSupplier(input: { gstin?: string; name?: string }): Promise<Supplier | undefined> {
+  const all = await repos().suppliers.list();
+  const gstin = input.gstin?.trim().toUpperCase();
+  if (gstin) {
+    const byGstin = all.find((s) => s.gstin.toUpperCase() === gstin);
+    if (byGstin) return byGstin;
+  }
+  const name = input.name?.trim().toLowerCase();
+  return name ? all.find((s) => s.name.toLowerCase() === name) : undefined;
+}
+
+/* ------------------------------------------------------------------ */
+/* Master lists (Settings → Catalogue lists)                           */
+/* ------------------------------------------------------------------ */
+
+export type MasterKind = "categories" | "collections" | "colours" | "fabrics";
+
+const MASTER_LABEL: Record<MasterKind, string> = { categories: "Category", collections: "Collection", colours: "Colour", fabrics: "Fabric" };
+
+export interface MasterInput {
+  name: string;
+  /** Colours only. */
+  hex?: string;
+  /** Fabrics only: default category for new designs. */
+  categoryId?: string;
+  /** Collections only. */
+  description?: string;
+}
+
+export async function addMaster(kind: MasterKind, input: MasterInput): Promise<void> {
+  assertPermission(currentActor(), "settings:manage");
+  const name = input.name.trim().replace(/\s+/g, " ");
+  if (!name) throw new DomainError(`${MASTER_LABEL[kind]} name is required`);
+  await transaction(async () => {
+    const r = repos();
+    const existing = (await r[kind].list()) as { name: string }[];
+    if (existing.some((e) => e.name.toLowerCase() === name.toLowerCase())) throw new DomainError(`${MASTER_LABEL[kind]} "${name}" already exists`);
+    switch (kind) {
+      case "colours":
+        await r.colours.add({ id: newId("col"), name, hex: input.hex || guessColourHex(name) });
+        break;
+      case "fabrics": {
+        const categories = await r.categories.list();
+        const categoryId = input.categoryId || categories.sort((a, b) => a.sortOrder - b.sortOrder)[0]?.id || "";
+        await r.fabrics.add({ id: newId("fab"), name, description: "", care: "Dry clean recommended", categoryId });
+        break;
+      }
+      case "collections":
+        await r.collections.add({ id: newId("clc"), name, slug: await uniqueSlug(name, (slug) => r.collections.list().then((all) => all.some((c) => c.slug === slug))), description: input.description ?? "", sortOrder: existing.length });
+        break;
+      case "categories":
+        await r.categories.add({ id: newId("cat"), name, slug: await uniqueSlug(name, (slug) => r.categories.list().then((all) => all.some((c) => c.slug === slug))), sortOrder: existing.length });
+        break;
+    }
+  });
+}
+
+export async function renameMaster(kind: MasterKind, id: string, input: MasterInput): Promise<void> {
+  assertPermission(currentActor(), "settings:manage");
+  const name = input.name.trim().replace(/\s+/g, " ");
+  if (!name) throw new DomainError(`${MASTER_LABEL[kind]} name is required`);
+  await transaction(async () => {
+    const r = repos();
+    const existing = (await r[kind].list()) as { id: string; name: string }[];
+    if (!existing.some((e) => e.id === id)) throw new DomainError(`${MASTER_LABEL[kind]} not found`);
+    if (existing.some((e) => e.id !== id && e.name.toLowerCase() === name.toLowerCase())) throw new DomainError(`${MASTER_LABEL[kind]} "${name}" already exists`);
+    if (kind === "colours") await r.colours.update(id, { name, ...(input.hex ? { hex: input.hex } : {}) });
+    else if (kind === "fabrics") await r.fabrics.update(id, { name, ...(input.categoryId ? { categoryId: input.categoryId } : {}) });
+    else if (kind === "collections") await r.collections.update(id, { name, ...(input.description !== undefined ? { description: input.description } : {}) });
+    else await r.categories.update(id, { name });
+  });
+}
+
+/** Deletes a master value. Refused while any design or piece still uses it, so history never dangles. */
+export async function deleteMaster(kind: MasterKind, id: string): Promise<void> {
+  assertPermission(currentActor(), "settings:manage");
+  await transaction(async () => {
+    const r = repos();
+    const designs = await r.designs.list();
+    const inUse =
+      kind === "categories" ? designs.filter((d) => d.categoryId === id).length
+      : kind === "fabrics" ? designs.filter((d) => d.fabricId === id).length
+      : kind === "collections" ? designs.filter((d) => d.collectionIds.includes(id)).length
+      : (await r.inventory.list()).filter((i) => i.colourId === id).length;
+    if (inUse) throw new DomainError(`${MASTER_LABEL[kind]} is used by ${inUse} ${kind === "colours" ? "piece" : "design"}${inUse === 1 ? "" : "s"}. Change those first.`);
+    if (kind === "fabrics" && (await r.fabrics.count()) <= 1) throw new DomainError("Keep at least one fabric");
+    if (kind === "categories" && (await r.categories.count()) <= 1) throw new DomainError("Keep at least one category");
+    if (kind === "categories") {
+      const fabrics = (await r.fabrics.list()).filter((f) => f.categoryId === id);
+      if (fabrics.length) throw new DomainError(`Category is the default for ${fabrics.map((f) => f.name).join(", ")}. Change those fabrics first.`);
+    }
+    await r[kind].remove(id);
+  });
+}
+
+async function uniqueSlug(name: string, taken: (slug: string) => Promise<boolean>): Promise<string> {
+  const base = slugify(name);
+  let slug = base;
+  for (let i = 2; await taken(slug); i++) slug = `${base}-${i}`;
+  return slug;
 }
 
 function toTitle(s: string): string {
@@ -161,7 +283,9 @@ export async function createDesignRecord(input: DesignInput): Promise<Design> {
   if (await r.designs.findByName(name)) throw new DomainError(`A design named "${name}" already exists`);
   const fabric = await r.fabrics.get(input.fabricId);
   if (!fabric) throw new DomainError("Choose a fabric for the new design");
-  if (!(input.price > 0) || !(input.mrp > 0)) throw new DomainError(`Enter MRP and selling price for "${name}"`);
+  const mrp = Math.max(0, Math.round(input.mrp || 0));
+  const price = Math.max(0, Math.round(input.price || 0));
+  if (mrp && price > mrp) throw new DomainError(`Selling price cannot be above MRP for "${name}"`);
 
   const seq = await r.counters.next("design");
   const code = `DSN-${String(seq).padStart(4, "0")}`;
@@ -185,8 +309,8 @@ export async function createDesignRecord(input: DesignInput): Promise<Design> {
     collectionIds: [...new Set(input.collectionIds)],
     ...base,
     description: input.description?.trim() || describeDesign(base, fabric.name),
-    mrp: Math.round(input.mrp),
-    price: Math.round(input.price),
+    mrp,
+    price,
     imageIds: input.imageIds ?? [],
     isPublished: input.isPublished ?? settings.store.autoPublishNewDesigns,
     createdAt: t,
@@ -198,7 +322,7 @@ export async function createDesignRecord(input: DesignInput): Promise<Design> {
     entityType: "DESIGN",
     entityId: design.id,
     entityLabel: `${design.name} (${design.code})`,
-    summary: `Design created at ${design.price}`,
+    summary: design.price ? `Design created at ${design.price}` : "Design created, price to be set on pieces",
   });
   return design;
 }

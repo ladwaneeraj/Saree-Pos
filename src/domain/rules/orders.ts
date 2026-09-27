@@ -47,9 +47,14 @@ export const CANCELLABLE_STATUSES: readonly OrderStatus[] = [
 /** Orders waiting for the packing team. */
 export const PENDING_DISPATCH_STATUSES: readonly OrderStatus[] = ["CONFIRMED", "RESERVED", "PACKING", "READY_TO_DISPATCH"];
 
-/** An order counts toward sales once payment is received and it was not cancelled. */
+/**
+ * An order counts toward sales once it is committed: not cancelled, and either paid (fully or partly)
+ * or already handed over on credit. Orders still waiting for the first payment do not count.
+ */
 export function countsAsSale(order: Pick<Order, "status" | "paymentStatus">): boolean {
-  return order.status !== "CANCELLED" && order.paymentStatus !== "PENDING";
+  if (order.status === "CANCELLED") return false;
+  if (order.paymentStatus !== "PENDING") return true;
+  return order.status === "DELIVERED";
 }
 
 export function humanizeOrderStatus(status: OrderStatus): string {
@@ -74,6 +79,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   PENDING: "Pending",
+  PARTIAL: "Partly paid",
   PAID: "Paid",
   PARTIALLY_REFUNDED: "Partly refunded",
   REFUNDED: "Refunded",

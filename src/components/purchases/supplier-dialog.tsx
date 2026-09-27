@@ -18,6 +18,7 @@ const schema = z.object({
   email: z.union([z.literal(""), z.string().trim().email("Enter a valid email")]),
   city: z.string().trim(),
   gstin: z.string().trim().toUpperCase().regex(/^$|^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/, "GSTIN should look like 29ABCDE1234F1Z5"),
+  code: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{0,6}$/, "Up to 6 letters or digits"),
 });
 type Values = z.infer<typeof schema>;
 
@@ -27,11 +28,12 @@ const FIELDS: { name: keyof Values; label: string; placeholder: string; span?: b
   { name: "phone", label: "Phone", placeholder: "98450 12345" },
   { name: "city", label: "City", placeholder: "Kanchipuram" },
   { name: "email", label: "Email", placeholder: "orders@example.in" },
-  { name: "gstin", label: "GSTIN (optional)", placeholder: "33ABCDE1234F1Z5", span: true },
+  { name: "gstin", label: "GSTIN (optional)", placeholder: "33ABCDE1234F1Z5" },
+  { name: "code", label: "Vendor code for SKUs", placeholder: "VS" },
 ];
 
 export function SupplierDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: (s: Supplier) => void }) {
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", contactName: "", phone: "", email: "", city: "", gstin: "" } });
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", contactName: "", phone: "", email: "", city: "", gstin: "", code: "" } });
   const { run, pending } = useAction(createSupplier, { success: (s) => `${s.name} added` });
 
   const submit = form.handleSubmit(async (values) => {

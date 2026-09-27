@@ -16,9 +16,16 @@ import { useAction } from "@/hooks/use-action";
 import { useCatalog } from "@/hooks/use-catalog";
 import { useLive } from "@/hooks/use-live";
 import { formatINR, formatNumber } from "@/lib/format";
-import { createPurchase, listDesignOptions, type DesignOption, type PurchaseInput } from "@/services/purchases";
+import { createPurchase, listDesignOptions, purchaseTotals, type DesignOption, type PurchaseInput } from "@/services/purchases";
+import type { ScannedBill } from "@/services/bill-scan";
+import { createSupplier, ensureColour, findSupplier } from "@/services/catalog";
+import type { PaymentMethod } from "@/domain/types";
+import { PAYMENT_METHOD_LABELS } from "@/services/orders";
+import { useSettings } from "@/hooks/use-catalog";
+import { toast } from "sonner";
 import { DesignCombobox } from "./design-combobox";
 import { ReceivedDialog, type ReceivedInfo } from "./received-dialog";
+import { ScanBillButton } from "./scan-bill-button";
 import { SupplierDialog } from "./supplier-dialog";
 
 const amount = (label: string) => z.string().trim().regex(/^\d+$/, `Enter ${label}`);
@@ -43,13 +50,41 @@ const lineSchema = z
     if (l.cost && l.price && cost > price) ctx.addIssue({ code: "custom", path: ["cost"], message: "Above selling price" });
   });
 
-const schema = z.object({
-  supplierId: z.string().min(1, "Choose a supplier"),
-  invoiceNumber: z.string().trim().min(1, "Enter the supplier invoice number"),
-  date: z.string().min(1, "Choose the invoice date"),
-  notes: z.string(),
-  lines: z.array(lineSchema).min(1, "Add at least one line"),
-});
+const optionalAmount = z.string().trim().regex(/^-?\d*$/, "Whole rupees only");
+
+const schema = z
+  .object({
+    supplierId: z.string().min(1, "Choose a supplier"),
+    invoiceNumber: z.string().trim().min(1, "Enter the supplier invoice number"),
+    date: z.string().min(1, "Choose the invoice date"),
+    notes: z.string(),
+    lines: z.array(lineSchema).min(1, "Add at least one line"),
+    gstRate: z.string().trim().regex(/^\d+(\.\d+)?$/, "Enter the GST %"),
+    /** Empty means "work it out from the rate". */
+    gstAmount: optionalAmount,
+    otherCharges: optionalAmount,
+    dueDate: z.string(),
+    paidAmount: z.string().trim().regex(/^\d*$/, "Whole rupees only"),
+    paidMethod: z.enum(["CASH", "UPI", "CARD", "NETBANKING"]),
+    paidReference: z.string().trim(),
+  })
+  .superRefine((v, ctx) => {
+    const rate = Number(v.gstRate);
+    if (!(rate >= 0 && rate <= 28)) ctx.addIssue({ code: "custom", path: ["gstRate"], message: "0 to 28%" });
+    const totals = purchaseTotals(billTotalsInput(v));
+    if (Number(v.paidAmount || 0) > totals.grandTotal) ctx.addIssue({ code: "custom", path: ["paidAmount"], message: `More than the bill total ${formatINR(totals.grandTotal)}` });
+  });
+
+type BillFields = { lines: { quantity: string; cost: string }[]; gstRate: string; gstAmount: string; otherCharges: string };
+
+function billTotalsInput(v: BillFields) {
+  return {
+    lines: v.lines.map((l) => ({ quantity: Number(l.quantity || 0), cost: Number(l.cost || 0) })) as PurchaseInput["lines"],
+    gstRate: Number(v.gstRate) || 0,
+    gstAmount: v.gstAmount.trim() === "" ? null : Number(v.gstAmount),
+    otherCharges: Number(v.otherCharges) || 0,
+  };
+}
 type Values = z.infer<typeof schema>;
 type Line = Values["lines"][number];
 
@@ -58,11 +93,15 @@ const today = () => new Date().toISOString().slice(0, 10);
 const digits = (v: string) => v.replace(/\D/g, "");
 
 function toInput(v: Values): PurchaseInput {
+  const paid = Number(v.paidAmount) || 0;
   return {
     supplierId: v.supplierId,
     invoiceNumber: v.invoiceNumber,
     date: new Date(`${v.date}T11:00:00`).getTime(),
     notes: v.notes.trim(),
+    ...billTotalsInput(v),
+    dueDate: v.dueDate ? new Date(`${v.dueDate}T18:00:00`).getTime() : null,
+    paidNow: paid > 0 ? { amount: paid, method: v.paidMethod, reference: v.paidReference } : null,
     lines: v.lines.map((l) => ({
       design: l.designId ? { designId: l.designId } : { newDesign: { name: l.designName, fabricId: l.fabricId, collectionIds: [], mrp: Number(l.mrp), price: Number(l.price) } },
       colourId: l.colourId,
@@ -83,12 +122,50 @@ export function PurchaseForm() {
   const [received, setReceived] = useState<ReceivedInfo | null>(null);
   const [mode, setMode] = useState<"draft" | "receive" | null>(null);
 
+  const settings = useSettings();
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { supplierId: "", invoiceNumber: "", date: today(), notes: "", lines: [emptyLine()] },
+    defaultValues: { supplierId: "", invoiceNumber: "", date: today(), notes: "", lines: [emptyLine()], gstRate: String(settings?.tax.gstRate ?? 5), gstAmount: "", otherCharges: "", dueDate: "", paidAmount: "", paidMethod: "UPI", paidReference: "" },
   });
   const lines = useFieldArray({ control: form.control, name: "lines" });
   const save = useAction(createPurchase);
+
+  /** Fills the form from a scanned bill. Existing designs are matched by name; the rest become new designs. */
+  const applyScan = async (bill: ScannedBill) => {
+    let supplier = await findSupplier({ gstin: bill.supplier.gstin, name: bill.supplier.name });
+    if (!supplier && bill.supplier.name) {
+      supplier = await createSupplier({ name: bill.supplier.name, contactName: "", phone: bill.supplier.phone.replace(/\D/g, "").slice(-10), email: "", city: "", gstin: /^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/.test(bill.supplier.gstin) ? bill.supplier.gstin : "" });
+      toast.info(`Added supplier ${supplier.name}`, { description: "Check the details under Purchases → suppliers." });
+    }
+    const scannedLines: Line[] = [];
+    for (const l of bill.lines) {
+      const existing = designs?.find((d) => d.name.toLowerCase() === l.description.toLowerCase());
+      const colour = l.colour ? await ensureColour(l.colour).catch(() => null) : null;
+      scannedLines.push({
+        designId: existing?.id ?? "",
+        designName: existing?.name ?? l.description,
+        fabricId: existing?.fabricId ?? "",
+        colourId: colour?.id ?? "",
+        quantity: String(l.quantity),
+        cost: String(l.rate || Math.round(l.amount / l.quantity) || ""),
+        mrp: existing ? String(existing.mrp || "") : "",
+        price: existing ? String(existing.price || "") : "",
+        location: "",
+      });
+    }
+    form.reset({
+      ...form.getValues(),
+      supplierId: supplier?.id ?? "",
+      invoiceNumber: bill.invoiceNumber || form.getValues("invoiceNumber"),
+      date: bill.date || form.getValues("date"),
+      gstRate: String(bill.gstRate),
+      gstAmount: bill.gstAmount ? String(bill.gstAmount) : "",
+      otherCharges: bill.otherCharges ? String(bill.otherCharges) : "",
+      paidAmount: bill.amountPaid ? String(bill.amountPaid) : "",
+      notes: bill.notes ? `Scanned bill. ${bill.notes}` : form.getValues("notes"),
+      lines: scannedLines.length ? scannedLines : form.getValues("lines"),
+    });
+  };
 
   const submit = (receiveNow: boolean) =>
     form.handleSubmit(async (values) => {
@@ -108,7 +185,10 @@ export function PurchaseForm() {
       <form onSubmit={(e) => { e.preventDefault(); void submit(true); }} className="grid gap-5 lg:grid-cols-[1fr_300px] lg:items-start">
         <div className="min-w-0 space-y-5">
           <section className="rounded-xl border bg-card p-4 shadow-xs sm:p-5">
-            <h2 className="mb-4 text-sm font-semibold">Supplier invoice</h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">Supplier invoice</h2>
+              <ScanBillButton onScanned={applyScan} disabled={save.pending} />
+            </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <FormField
                 control={form.control}
@@ -175,6 +255,8 @@ export function PurchaseForm() {
               <Plus /> Add another design
             </Button>
           </section>
+
+          <BillSection control={form.control} />
         </div>
 
         <Summary control={form.control} pending={save.pending} mode={mode} onDraft={() => void submit(false)} />
@@ -312,6 +394,71 @@ function LineCard({ index, control, designs, onRemove, setValue, getValues }: {
         )} />
       </div>
     </div>
+  );
+}
+
+/** GST and payment as printed on the supplier bill. Unpaid balance shows up under Payables. */
+function BillSection({ control }: { control: Control<Values> }) {
+  const v = useWatch({ control });
+  const totals = purchaseTotals(billTotalsInput({ lines: (v.lines ?? []) as BillFields["lines"], gstRate: v.gstRate ?? "0", gstAmount: v.gstAmount ?? "", otherCharges: v.otherCharges ?? "" }));
+  const paid = Number(v.paidAmount) || 0;
+  const balance = Math.max(0, totals.grandTotal - paid);
+  const field = (name: "gstRate" | "gstAmount" | "otherCharges" | "paidAmount" | "paidReference" | "dueDate", label: string, o: { placeholder?: string; type?: string; prefix?: string; suffix?: string; description?: string } = {}) => (
+    <FormField
+      control={control}
+      name={name}
+      render={({ field: f }) => (
+        <FormItem>
+          <FormLabel className="text-xs">{label}</FormLabel>
+          <div className="relative">
+            {o.prefix && <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-sm text-muted-foreground">{o.prefix}</span>}
+            <FormControl>
+              <Input type={o.type} inputMode={o.type ? undefined : "numeric"} placeholder={o.placeholder} {...f} className={o.prefix ? "pl-6 tabular" : "tabular"} />
+            </FormControl>
+            {o.suffix && <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-muted-foreground">{o.suffix}</span>}
+          </div>
+          {o.description && <p className="text-[11px] text-muted-foreground">{o.description}</p>}
+          <FormMessage className="text-xs" />
+        </FormItem>
+      )}
+    />
+  );
+  return (
+    <section className="rounded-xl border bg-card p-4 shadow-xs sm:p-5">
+      <h2 className="mb-1 text-sm font-semibold">GST and payment</h2>
+      <p className="mb-4 text-xs text-muted-foreground">As printed on the bill. Leave the GST amount empty to work it out from the rate.</p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {field("gstRate", "GST rate", { suffix: "%", placeholder: "5" })}
+        {field("gstAmount", "GST amount (from bill)", { prefix: "₹", placeholder: String(totals.gstAmount) })}
+        {field("otherCharges", "Other charges / round-off", { prefix: "₹", placeholder: "0", description: "Freight, packing. Negative for a discount." })}
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-4">
+        {field("paidAmount", "Paid now", { prefix: "₹", placeholder: "0" })}
+        <FormField
+          control={control}
+          name="paidMethod"
+          render={({ field: f }) => (
+            <FormItem>
+              <FormLabel className="text-xs">Paid by</FormLabel>
+              <Select value={f.value} onValueChange={f.onChange}>
+                <FormControl><SelectTrigger className="w-full bg-card"><SelectValue /></SelectTrigger></FormControl>
+                <SelectContent>
+                  {(["UPI", "CASH", "CARD", "NETBANKING"] as PaymentMethod[]).map((m) => <SelectItem key={m} value={m}>{PAYMENT_METHOD_LABELS[m]}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FormItem>
+          )}
+        />
+        {field("paidReference", "Reference", { type: "text", placeholder: "UTR / cheque no." })}
+        {field("dueDate", "Balance due by", { type: "date" })}
+      </div>
+      <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-1 border-t pt-3 text-sm sm:grid-cols-4">
+        <div className="flex justify-between sm:block"><dt className="text-xs text-muted-foreground">Taxable</dt><dd className="tabular">{formatINR(totals.totalCost)}</dd></div>
+        <div className="flex justify-between sm:block"><dt className="text-xs text-muted-foreground">GST</dt><dd className="tabular">{formatINR(totals.gstAmount)}</dd></div>
+        <div className="flex justify-between sm:block"><dt className="text-xs text-muted-foreground">Bill total</dt><dd className="font-semibold tabular">{formatINR(totals.grandTotal)}</dd></div>
+        <div className="flex justify-between sm:block"><dt className="text-xs text-muted-foreground">Balance payable</dt><dd className={`font-semibold tabular ${balance > 0 ? "text-destructive" : "text-success"}`}>{formatINR(balance)}</dd></div>
+      </dl>
+    </section>
   );
 }
 

@@ -4,6 +4,8 @@ import { DomainError } from "@/domain/errors";
 import { assertPermission } from "@/domain/permissions";
 import { isAvailableNow, isHeldBy, unavailableReason } from "@/domain/rules/inventory";
 import { effectivePrice } from "@/domain/rules/pricing";
+import { paymentStatusFor } from "@/domain/rules/payments";
+import { formatINR } from "@/lib/format";
 import { changeItems } from "./inventory-core";
 import { getCatalog } from "./catalog";
 import { currentActor, now } from "./context";
@@ -123,6 +125,8 @@ export interface PosSaleInput {
   orderDiscount: number;
   customer: { id: string } | { name: string; phone: string } | null;
   payments: { method: PaymentMethod; amount: number; reference?: string }[];
+  /** Amount the customer will pay later. Requires a customer. */
+  credit?: number;
   notes?: string;
   sendReceipt?: boolean;
 }
@@ -152,6 +156,9 @@ export async function completePosSale(input: PosSaleInput): Promise<Order> {
 
     const payments: PaymentInput[] = input.payments.filter((p) => p.amount > 0);
     const methods = new Set(payments.map((p) => p.method));
+    const credit = Math.max(0, Math.round(input.credit ?? 0));
+    if (credit > 0 && !customer) throw new DomainError("Add the customer before selling on credit");
+    const paidNow = payments.reduce((s, p) => s + p.amount, 0);
     const { order } = await createOrderInTx({
       channel: "SHOP",
       items,
@@ -161,11 +168,13 @@ export async function completePosSale(input: PosSaleInput): Promise<Order> {
       shippingAddress: null,
       fulfilment: "IN_STORE",
       status: "DELIVERED",
-      paymentStatus: "PAID",
+      paymentStatus: credit > 0 ? paymentStatusFor(paidNow + credit, paidNow) : "PAID",
       payments,
       events: [
         { label: "Order placed at counter", status: "CONFIRMED" },
-        { label: "Payment received", status: null, note: [...methods].join(" + ") },
+        credit > 0
+          ? { label: paidNow > 0 ? "Part payment received" : "Sold on credit", status: null, note: paidNow > 0 ? `${[...methods].join(" + ")} · ${formatINR(credit)} due` : `${formatINR(credit)} due` }
+          : { label: "Payment received", status: null, note: [...methods].join(" + ") },
         { label: "Handed over to customer", status: "DELIVERED" },
       ],
       notes: input.notes,

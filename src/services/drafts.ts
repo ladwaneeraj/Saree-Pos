@@ -42,6 +42,7 @@ export async function addDrafts(entries: NewDraft[]): Promise<InventoryDraft[]> 
       mrp: null,
       price: null,
       location: "",
+      quantity: 1,
       ...e.values,
       createdAt: t + i,
       updatedAt: t + i,

@@ -35,10 +35,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
     phone: "+91 98450 21870",
     whatsapp: "+91 98450 21870",
     email: "hello@dhanvisilks.in",
+    website: "www.dhanvisilks.com",
     address: "1st Floor, 214 Chamarajpet Main Road",
     city: "Davanagere",
     state: "Karnataka",
     pincode: "577001",
+    shopCode: "DS",
+    upiId: "dhanvisilks@okhdfc",
+    invoiceTerms:
+      "Goods once sold will not be taken back or exchanged. Disputes subject to local jurisdiction only. Damage from rain, stains, wrong cleaning or wear after purchase is not covered. Altered products, falls or tasseling are ineligible for return or exchange. Discounted or sale items cannot be returned.",
   },
   store: {
     cartReservationMinutes: 15,
@@ -70,8 +75,31 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   labels: {
     size: "THERMAL_50x25",
+    skuTemplate: "{shop}{vendor}{pattern}{seq:4}",
+    defaultVendorCode: "XX",
+    headerText: "",
     showDesignName: true,
     showColour: true,
+    showFabric: false,
+    showPattern: false,
+    showPrice: false,
+    priceMode: "PLAIN",
+    priceCipher: "SILKWEAVER",
+  },
+  catalog: {
+    patterns: [
+      { name: "Checks", code: "CHC" },
+      { name: "Zari buttas", code: "ZBT" },
+      { name: "Plain", code: "PLN" },
+      { name: "Floral", code: "FLR" },
+      { name: "Temple", code: "TMP" },
+      { name: "Stripes", code: "STR" },
+    ],
+    borders: ["Temple border", "Zari border", "Contrast border", "Plain border", "Kanchi border"],
+  },
+  ai: {
+    anthropicApiKey: "",
+    model: "claude-sonnet-4-5",
   },
   users: [
     { id: "u-owner", name: "Ramesh Hegde", role: "OWNER", email: "ramesh@dhanvisilks.in" },

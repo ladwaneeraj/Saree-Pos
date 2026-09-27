@@ -7,6 +7,7 @@ import type {
   InventoryDraft,
   InventoryItem,
   InventoryMovement,
+  InvoiceFile,
   InventoryStatus,
   Notification,
   Order,
@@ -15,6 +16,7 @@ import type {
   Payment,
   Purchase,
   PurchaseItem,
+  PurchasePayment,
   ReturnRequest,
   ReturnStatus,
   Review,
@@ -37,7 +39,9 @@ import type {
   OrderItemRepository,
   OrderRepository,
   PaymentRepository,
+  InvoiceRepository,
   PurchaseItemRepository,
+  PurchasePaymentRepository,
   PurchaseRepository,
   Repositories,
   Repository,
@@ -232,6 +236,18 @@ class DexiePurchaseItemRepository extends DexieRepository<PurchaseItem> implemen
   }
 }
 
+class DexiePurchasePaymentRepository extends DexieRepository<PurchasePayment> implements PurchasePaymentRepository {
+  listByPurchase(purchaseId: string) {
+    return this.table.where("purchaseId").equals(purchaseId).sortBy("createdAt");
+  }
+}
+
+class DexieInvoiceRepository extends DexieRepository<InvoiceFile> implements InvoiceRepository {
+  async listByOrder(orderId: string) {
+    return byCreatedDesc(await this.table.where("orderId").equals(orderId).toArray());
+  }
+}
+
 class DexieReturnRepository extends DexieRepository<ReturnRequest> implements ReturnRepository {
   listByOrder(orderId: string) {
     return this.table.where("orderId").equals(orderId).toArray();
@@ -353,6 +369,8 @@ export function createDexieRepositories(db: ShopDatabase): Repositories {
     suppliers: new DexieRepository(db.suppliers),
     purchases: new DexiePurchaseRepository(db.purchases),
     purchaseItems: new DexiePurchaseItemRepository(db.purchaseItems),
+    purchasePayments: new DexiePurchasePaymentRepository(db.purchasePayments),
+    invoices: new DexieInvoiceRepository(db.invoices),
     customers: new DexieCustomerRepository(db.customers),
     orders: new DexieOrderRepository(db.orders),
     orderItems: new DexieOrderItemRepository(db.orderItems),

@@ -1,7 +1,10 @@
 "use client";
 
-import { CheckCircle2, ExternalLink, MessageCircle, Plus, Printer } from "lucide-react";
+import { CheckCircle2, Download, ExternalLink, MessageCircle, Plus, Printer } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useRef } from "react";
+import { balanceDue } from "@/domain/rules/payments";
+import { downloadInvoicePdf, saveInvoicePdf } from "@/services/invoices";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,6 +33,16 @@ export function ReceiptDialog({ order, onNewSale }: { order: Order | null; onNew
   const hasPhone = !!data?.order.customer.phone;
   const b = settings?.business;
   const tax = data ? splitInclusiveTax(data.order.total - data.order.shippingFee, data.order.taxRate) : null;
+  const download = useAction(downloadInvoicePdf, { success: "Invoice PDF downloaded" });
+  const due = data ? balanceDue(data.order) : 0;
+
+  // Every completed sale gets its PDF stored right away, so the bill exists even if nobody clicks anything.
+  const savedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!order || savedFor.current === order.id) return;
+    savedFor.current = order.id;
+    saveInvoicePdf(order.id).catch(() => undefined);
+  }, [order]);
 
   return (
     <Dialog open={!!order} onOpenChange={(o) => !o && onNewSale()}>
@@ -40,7 +53,7 @@ export function ReceiptDialog({ order, onNewSale }: { order: Order | null; onNew
           <DialogTitle className="text-xl">Sale completed</DialogTitle>
           <DialogDescription>
             {order ? (
-              <>Order <Link href={`/orders/view?number=${order.number}`} className="font-medium text-primary hover:underline" data-testid="receipt-order-link">#{order.number}</Link> · {formatINR(order.total)} received · pieces marked sold</>
+              <>Order <Link href={`/orders/view?number=${order.number}`} className="font-medium text-primary hover:underline" data-testid="receipt-order-link">#{order.number}</Link> · {formatINR(order.amountPaid)} received{balanceDue(order) > 0 && `, ${formatINR(balanceDue(order))} due`} · pieces marked sold</>
             ) : null}
           </DialogDescription>
         </DialogHeader>
@@ -71,6 +84,12 @@ export function ReceiptDialog({ order, onNewSale }: { order: Order | null; onNew
               <div className="flex justify-between"><span>Subtotal</span><span>{formatINR(data.order.subtotal)}</span></div>
               {data.order.discount > 0 && <div className="flex justify-between"><span>Bill discount</span><span>−{formatINR(data.order.discount)}</span></div>}
               <div className="flex justify-between text-[14px] font-bold"><span>TOTAL</span><span>{formatINR(data.order.total)}</span></div>
+              {due > 0 && (
+                <>
+                  <div className="flex justify-between"><span>Received</span><span>{formatINR(data.order.amountPaid)}</span></div>
+                  <div className="flex justify-between font-bold"><span>BALANCE DUE</span><span>{formatINR(due)}</span></div>
+                </>
+              )}
               <div className="flex justify-between text-black/60"><span>Taxable value</span><span>{formatINRPaise(tax.taxable)}</span></div>
               <div className="flex justify-between text-black/60"><span>CGST {data.order.taxRate / 2}%</span><span>{formatINRPaise(tax.cgst)}</span></div>
               <div className="flex justify-between text-black/60"><span>SGST {data.order.taxRate / 2}%</span><span>{formatINRPaise(tax.sgst)}</span></div>
@@ -94,8 +113,9 @@ export function ReceiptDialog({ order, onNewSale }: { order: Order | null; onNew
           ) : (
             <p className="text-xs text-muted-foreground">Walk-in sale. Add a customer next time to send the bill on WhatsApp.</p>
           )}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             <Button variant="outline" onClick={() => window.print()} disabled={!data}><Printer /> Print</Button>
+            <Button variant="outline" onClick={() => order && download.run(order.id)} disabled={!data || download.pending}><Download /> PDF</Button>
             <Button variant="outline" asChild>
               <Link href={order ? `/orders/view?number=${order.number}` : "#"}><ExternalLink /> Order</Link>
             </Button>

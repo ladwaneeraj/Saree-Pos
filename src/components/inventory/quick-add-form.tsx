@@ -1,7 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, CheckCircle2, Copy, Info, Loader2, Lock, Printer, ScanBarcode, Sparkles, Wand2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Copy, Info, Loader2, Lock, Minus, Plus, Printer, ScanBarcode, Sparkles, Wand2 } from "lucide-react";
+import { BorderSelect, CollectionPicker, PatternSelect } from "@/components/designs/design-pickers";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -40,7 +41,8 @@ const schema = z
     designName: z.string(),
     colourId: z.string().min(1, "Choose a colour"),
     fabricId: z.string(),
-    collectionId: z.string(),
+    collectionIds: z.array(z.string()),
+    supplierId: z.string(),
     pattern: z.string(),
     border: z.string(),
     lengthM: z.string(),
@@ -76,7 +78,8 @@ const EMPTY: Values = {
   designName: "",
   colourId: "",
   fabricId: "",
-  collectionId: "",
+  collectionIds: [],
+  supplierId: "",
   pattern: "",
   border: "",
   lengthM: "6.3",
@@ -93,13 +96,13 @@ function designFields(d: Design): Partial<Values> {
     designId: d.id,
     designName: d.name,
     fabricId: d.fabricId,
-    collectionId: d.collectionIds[0] ?? "",
+    collectionIds: d.collectionIds,
     pattern: d.pattern,
     border: d.border,
     lengthM: String(d.lengthM),
     blouseIncluded: d.blouseIncluded,
-    mrp: String(d.mrp),
-    price: String(d.price),
+    mrp: d.mrp ? String(d.mrp) : "",
+    price: d.price ? String(d.price) : "",
   };
 }
 
@@ -129,7 +132,7 @@ export function QuickAddForm() {
   const v = useWatch({ control: form.control }) as Values;
   const existing = designs?.find((d) => d.id === v.designId);
   const qty = Math.min(50, Math.max(1, Number(v.quantity) || 1));
-  const { data: nextSkus } = useLive(() => peekNextSkus(qty), [qty]);
+  const { data: nextSkus } = useLive(() => peekNextSkus(qty, { designId: v.designId || null, pattern: v.pattern, fabricId: v.fabricId || null, supplierId: v.supplierId || null }), [qty, v.designId, v.pattern, v.fabricId, v.supplierId]);
 
   // Duplicate & change: prefill from an existing piece, leaving colour and photos for the new saree.
   useEffect(() => {
@@ -207,7 +210,7 @@ export function QuickAddForm() {
               newDesign: {
                 name: values.designName.trim(),
                 fabricId: values.fabricId,
-                collectionIds: values.collectionId ? [values.collectionId] : [],
+                collectionIds: values.collectionIds,
                 pattern: values.pattern,
                 border: values.border,
                 lengthM: Number(values.lengthM),
@@ -224,6 +227,7 @@ export function QuickAddForm() {
         location: values.location.trim().toUpperCase(),
         imageIds: values.imageIds,
         quantity: Number(values.quantity),
+        supplierId: values.supplierId || null,
       };
       try {
         const items = await createPieces([input], { source: fromId ? "DUPLICATE" : "QUICK_ADD" });
@@ -326,7 +330,7 @@ export function QuickAddForm() {
                       <FormDescription>
                         {existing ? (
                           <>
-                            Existing design {existing.code}: fabric, collection and details come from the design.{" "}
+                            Existing design {existing.code}: fabric, collections and details come from the design.{" "}
                             <Link href={`/designs/view?id=${existing.id}`} className="text-primary hover:underline">Edit design</Link>
                           </>
                         ) : v.designName ? (
@@ -384,28 +388,57 @@ export function QuickAddForm() {
                 />
                 <FormField
                   control={form.control}
-                  name="collectionId"
+                  name="supplierId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="gap-1.5">Collection {locked && <Lock className="size-3 text-muted-foreground" />}</FormLabel>
-                      <Select value={field.value || NONE} onValueChange={(x) => field.onChange(x === NONE ? "" : x)} disabled={locked}>
+                      <FormLabel>Supplier (optional)</FormLabel>
+                      <Select value={field.value || NONE} onValueChange={(x) => field.onChange(x === NONE ? "" : x)}>
                         <FormControl>
                           <SelectTrigger className="w-full bg-card">
-                            <SelectValue placeholder="No collection" />
+                            <SelectValue placeholder="No supplier" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value={NONE}>No collection</SelectItem>
-                          {catalog.collections.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          <SelectItem value={NONE}>No supplier</SelectItem>
+                          {catalog.suppliers.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>{s.name}{s.code && <span className="ml-1 font-mono text-xs text-muted-foreground">{s.code}</span>}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormDescription>Sets the vendor part of the SKU.</FormDescription>
                     </FormItem>
                   )}
                 />
-                <TextField form={form} name="pattern" label="Pattern" placeholder="Zari buttas" disabled={locked} />
-                <TextField form={form} name="border" label="Border" placeholder="Temple border" disabled={locked} />
+                <FormField
+                  control={form.control}
+                  name="pattern"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="gap-1.5">Pattern {locked && <Lock className="size-3 text-muted-foreground" />}</FormLabel>
+                      <PatternSelect value={field.value} onChange={field.onChange} disabled={locked} />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="border"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="gap-1.5">Border {locked && <Lock className="size-3 text-muted-foreground" />}</FormLabel>
+                      <BorderSelect value={field.value} onChange={field.onChange} disabled={locked} />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="collectionIds"
+                  render={({ field }) => (
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel className="gap-1.5">Collections {locked && <Lock className="size-3 text-muted-foreground" />}</FormLabel>
+                      <CollectionPicker value={field.value} onChange={field.onChange} disabled={locked} />
+                    </FormItem>
+                  )}
+                />
                 <div className="grid grid-cols-[1fr_auto] items-start gap-3">
                   <TextField form={form} name="lengthM" label="Saree length (m)" placeholder="6.3" disabled={locked} inputMode="decimal" />
                   <FormField
@@ -427,12 +460,29 @@ export function QuickAddForm() {
               </div>
             </Panel>
 
-            <Panel title="Price and stock">
+            <Panel title="Quantity and price">
               <div className="grid gap-4 sm:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="quantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>How many pieces?</FormLabel>
+                      <div className="flex items-center gap-1">
+                        <Button type="button" variant="outline" size="icon" aria-label="One less" onClick={() => field.onChange(String(Math.max(1, (Number(field.value) || 1) - 1)))}><Minus /></Button>
+                        <FormControl>
+                          <Input {...field} inputMode="numeric" className="bg-card text-center text-lg font-semibold tabular" onChange={(e) => field.onChange(e.target.value.replace(/[^\d]/g, ""))} />
+                        </FormControl>
+                        <Button type="button" variant="outline" size="icon" aria-label="One more" onClick={() => field.onChange(String(Math.min(50, (Number(field.value) || 0) + 1)))}><Plus /></Button>
+                      </div>
+                      <FormDescription>Identical pieces in this colour. Each gets its own SKU.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <TextField form={form} name="cost" label="Purchase cost (₹)" placeholder="4200" inputMode="numeric" />
                 <TextField form={form} name="mrp" label="MRP (₹)" placeholder="8999" inputMode="numeric" />
                 <TextField form={form} name="price" label="Selling price (₹)" placeholder="6499" inputMode="numeric" />
-                <TextField form={form} name="quantity" label="Quantity" placeholder="1" inputMode="numeric" description="Identical pieces, each gets its own SKU" />
                 <FormField
                   control={form.control}
                   name="location"

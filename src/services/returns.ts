@@ -215,9 +215,9 @@ export async function refundReturn(returnId: string, method: PaymentMethod): Pro
     const fullyReturned = remaining.length === 0;
     order = await setOrderStatusInTx(order, fullyReturned ? "RETURNED" : "DELIVERED", `Return ${ret.number} received`, actor);
     if (fullyReturned) {
-      order = await setOrderStatusInTx(order, "REFUNDED", `Refunded ${formatINR(ret.refundAmount)}`, actor, { paymentStatus: "REFUNDED" });
+      order = await setOrderStatusInTx(order, "REFUNDED", `Refunded ${formatINR(ret.refundAmount)}`, actor, { paymentStatus: "REFUNDED", amountPaid: Math.max(0, order.amountPaid - ret.refundAmount) });
     } else {
-      order = { ...order, paymentStatus: "PARTIALLY_REFUNDED", updatedAt: now() };
+      order = { ...order, paymentStatus: "PARTIALLY_REFUNDED", amountPaid: Math.max(0, order.amountPaid - ret.refundAmount), updatedAt: now() };
       await r.orders.put(order);
     }
     const updated = await saveReturn(ret, "REFUNDED", `Refunded ${formatINR(ret.refundAmount)} via ${method}`, actor);
@@ -302,7 +302,7 @@ export async function completeExchange(returnId: string, newItemId: string, sett
       : { type: "SOLD", status: "SOLD", reservation: null, soldOrderId: order.id, channel: order.channel, refType: "ORDER", refId: order.id, refLabel: `#${order.number}`, note: `Exchange for ${ret.number}` },
       actor);
     await markOrderItems(ret, "EXCHANGED");
-    await setOrderStatusInTx(original, "DELIVERED", `Exchanged via ${ret.number} → order #${order.number}`, actor, difference < 0 ? { paymentStatus: "PARTIALLY_REFUNDED" } : {});
+    await setOrderStatusInTx(original, "DELIVERED", `Exchanged via ${ret.number} → order #${order.number}`, actor, difference < 0 ? { paymentStatus: "PARTIALLY_REFUNDED", amountPaid: Math.max(0, original.amountPaid + difference) } : {});
     const updated = await saveReturn(ret, "EXCHANGED", `Exchanged for ${newItem!.sku} (${difference === 0 ? "no difference" : difference > 0 ? `collected ${formatINR(difference)}` : `refunded ${formatINR(-difference)}`})`, actor, {
       exchange: { newInventoryItemId: newItem!.id, newSku: newItem!.sku, newDesignName: design.name, newPrice, priceDifference: difference, newOrderId: order.id },
     });

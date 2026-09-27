@@ -174,6 +174,7 @@ export function generateDemoData(now: number, origin: string): SeedTables {
   const suppliers: Supplier[] = SUPPLIERS.map((s, i) => ({
     id: `sup_${i + 1}`,
     name: s.name,
+    code: s.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 3),
     contactName: s.contactName,
     phone: `9${rng.digits(9)}`,
     email: `orders@${slugify(s.name).replace(/-/g, "")}.in`,
@@ -301,6 +302,12 @@ export function generateDemoData(now: number, origin: string): SeedTables {
         status: "RECEIVED",
         pieceCount: 0,
         totalCost: 0,
+        gstRate: 5,
+        gstAmount: 0,
+        grandTotal: 0,
+        amountPaid: 0,
+        paymentStatus: "PAID",
+        dueDate: null,
         notes: "",
         receivedAt: date + 2 * HOUR,
         createdAt: date,
@@ -331,6 +338,9 @@ export function generateDemoData(now: number, origin: string): SeedTables {
       });
       purchase.pieceCount += qty;
       purchase.totalCost += qty * cost;
+      purchase.gstAmount = Math.round(purchase.totalCost * purchase.gstRate / 100);
+      purchase.grandTotal = purchase.totalCost + purchase.gstAmount;
+      purchase.amountPaid = purchase.grandTotal;
       for (let n = 0; n < qty; n++) {
         pieces.push({
           id: rng.id("itm"),
@@ -682,6 +692,7 @@ export function generateDemoData(now: number, origin: string): SeedTables {
       channel: draft.channel,
       status,
       paymentStatus: paid ? "PAID" : "PENDING",
+      amountPaid: paid ? total : 0,
       fulfilment: draft.fulfilment,
       customerId: customer?.id ?? null,
       customer: snapshot,

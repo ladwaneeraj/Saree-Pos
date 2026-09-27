@@ -4,7 +4,8 @@ import { Info, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SaveFooter, SettingsCard, SwitchField, TextField, useSettingsForm } from "./settings-kit";
@@ -25,6 +26,10 @@ const businessSchema = z.object({
   city: z.string().trim().min(2, "Enter the city"),
   state: z.string().trim().min(2, "Enter the state"),
   pincode: z.string().trim().regex(/^\d{6}$/, "6 digit PIN code"),
+  website: z.string().trim(),
+  shopCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,6}$/, "1 to 6 letters or digits"),
+  upiId: z.string().trim().regex(/^$|^[\w.-]{2,}@[a-zA-Z]{2,}$/, "Looks like name@bank"),
+  invoiceTerms: z.string().trim(),
 });
 
 export function BusinessForm() {
@@ -41,12 +46,26 @@ export function BusinessForm() {
             <TextField form={form} name="email" label="Email" type="email" />
             <TextField form={form} name="phone" label="Phone" type="tel" />
             <TextField form={form} name="whatsapp" label="WhatsApp number" type="tel" description="Customers reply to this number" />
+            <TextField form={form} name="website" label="Website" placeholder="www.dhanvisilks.com" />
+            <TextField form={form} name="shopCode" label="Shop code" upper placeholder="DS" description="Used in SKUs ({shop}) and invoice numbers, e.g. DS/26-27/Aug470" />
+            <TextField form={form} name="upiId" label="UPI ID for payments" placeholder="shop@okhdfc" description="Unpaid invoices get a QR that opens this payee with the balance filled in" className="sm:col-span-2" />
             <TextField form={form} name="address" label="Address" className="sm:col-span-2" />
             <TextField form={form} name="city" label="City" />
             <div className="grid grid-cols-2 gap-4">
               <TextField form={form} name="state" label="State" />
               <TextField form={form} name="pincode" label="PIN code" />
             </div>
+            <FormField
+              control={form.control}
+              name="invoiceTerms"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2">
+                  <FormLabel>Invoice terms & conditions</FormLabel>
+                  <FormControl><Textarea rows={4} {...field} /></FormControl>
+                  <FormDescription className="text-xs">Printed at the bottom of every invoice and PDF.</FormDescription>
+                </FormItem>
+              )}
+            />
           </div>
         </SettingsCard>
       </form>

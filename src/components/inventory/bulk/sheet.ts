@@ -6,7 +6,7 @@ import type { Collection, Colour, Design, Fabric, InventoryDraft } from "@/domai
 import type { DraftPatch } from "@/services/drafts";
 import type { NewPieceInput } from "@/services/inventory";
 
-export type ColKey = "design" | "colour" | "fabric" | "collection" | "cost" | "mrp" | "price" | "location";
+export type ColKey = "design" | "colour" | "fabric" | "collection" | "quantity" | "cost" | "mrp" | "price" | "location";
 
 export interface ColDef {
   key: ColKey;
@@ -21,6 +21,7 @@ export const ALL_COLUMNS: ColDef[] = [
   { key: "colour", label: "Colour", width: 132, kind: "combo" },
   { key: "fabric", label: "Fabric", width: 112, kind: "combo" },
   { key: "collection", label: "Collection", width: 112, kind: "combo" },
+  { key: "quantity", label: "Qty", width: 56, kind: "number", align: "right" },
   { key: "cost", label: "Cost", width: 84, kind: "number", align: "right" },
   { key: "mrp", label: "MRP", width: 84, kind: "number", align: "right" },
   { key: "price", label: "Selling", width: 88, kind: "number", align: "right" },
@@ -88,6 +89,8 @@ export function cellText(row: InventoryDraft, col: ColKey, lk: Lookups): string 
     case "mrp":
     case "price":
       return row[col] == null ? "" : String(row[col]);
+    case "quantity":
+      return String(row.quantity ?? 1);
     case "location":
       return row.location;
   }
@@ -153,6 +156,10 @@ export function textPatch(row: InventoryDraft, col: ColKey, text: string, lk: Lo
       const n = parseAmount(t);
       return n === null ? null : { [col]: n };
     }
+    case "quantity": {
+      const n = Math.round(Number(t));
+      return Number.isInteger(n) && n >= 1 && n <= 500 ? { quantity: n } : t ? null : { quantity: 1 };
+    }
     case "location":
       return { location: t.toUpperCase() };
   }
@@ -171,6 +178,7 @@ export function checkRow(row: InventoryDraft, lk: Lookups, needCost: boolean): R
   if (!row.colourId) errors.push("Colour is missing");
   if (!design && row.designName.trim() && !row.fabricId) errors.push("Fabric is needed for a new design");
   if (needCost && row.cost == null) errors.push("Purchase cost is missing");
+  if (!(row.quantity >= 1)) errors.push("Quantity must be at least 1");
   if (row.mrp == null || row.mrp <= 0) errors.push("MRP is missing");
   if (row.price == null || row.price <= 0) errors.push("Selling price is missing");
   if (row.price != null && row.mrp != null && row.price > row.mrp) errors.push("Selling price is above MRP");
@@ -199,6 +207,7 @@ export function toPieceInput(row: InventoryDraft): NewPieceInput {
     price: row.price ?? 0,
     location: row.location,
     imageIds: row.imageIds,
+    quantity: row.quantity ?? 1,
   };
 }
 

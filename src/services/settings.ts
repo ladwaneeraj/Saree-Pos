@@ -31,6 +31,8 @@ const SECTION_LABELS: Record<SettingsKey, string> = {
   shipping: "Shipping settings",
   notifications: "Notification settings",
   labels: "Label settings",
+  catalog: "Catalogue lists",
+  ai: "AI settings",
   users: "Users & roles",
 };
 

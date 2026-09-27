@@ -33,6 +33,7 @@ const ACTION_META: Record<AuditAction, { label: string; tone: Tone }> = {
   PAYMENT_RECORDED: { label: "Payment recorded", tone: "success" },
   RETURN_UPDATED: { label: "Return updated", tone: "warning" },
   PURCHASE_RECEIVED: { label: "Purchase received", tone: "info" },
+  PURCHASE_PAYMENT: { label: "Supplier paid", tone: "success" },
   SETTINGS_CHANGED: { label: "Settings changed", tone: "neutral" },
   DEMO_RESET: { label: "Demo reset", tone: "danger" },
   DATA_IMPORTED: { label: "Data imported", tone: "info" },

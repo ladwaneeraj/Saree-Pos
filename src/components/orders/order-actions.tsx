@@ -40,13 +40,14 @@ import { copyText } from "@/lib/files";
 import { formatINR } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { advanceShipment, handOverAtStore, markDelivered, startPacking } from "@/services/dispatch";
-import { PAYMENT_METHOD_LABELS, addOrderNote, cancelOrder, confirmPayment, type OrderDetail } from "@/services/orders";
+import { PAYMENT_METHOD_LABELS, addOrderNote, cancelOrder, confirmPayment, recordOrderPayment, type OrderDetail } from "@/services/orders";
+import { balanceDue } from "@/domain/rules/payments";
 import { requestReturn } from "@/services/returns";
 import { useCan } from "@/stores/session";
 import { InvoiceDialog } from "./invoice-dialog";
 import { useOrderAction } from "./use-order-action";
 
-type DialogKind = null | "payment" | "cancel" | "return" | "note" | "dispatch" | "pick" | "invoice";
+type DialogKind = null | "payment" | "balance" | "cancel" | "return" | "note" | "dispatch" | "pick" | "invoice";
 
 const SHIPMENT_LABEL: Record<ShipmentStatus, string> = { DISPATCHED: "Dispatched", IN_TRANSIT: "In transit", OUT_FOR_DELIVERY: "Out for delivery", DELIVERED: "Delivered" };
 
@@ -87,6 +88,9 @@ export function OrderActions({ detail }: { detail: OrderDetail }) {
   const primary: React.ReactNode[] = [];
   if (canManage && (s === "PAYMENT_PENDING" || s === "NEW"))
     primary.push(<Button key="pay" onClick={() => setDialog("payment")}><CreditCard /> Confirm payment</Button>);
+  const due = balanceDue(order);
+  if (canManage && due > 0 && s !== "PAYMENT_PENDING" && s !== "NEW" && s !== "CANCELLED")
+    primary.push(<Button key="balance" onClick={() => setDialog("balance")}><CreditCard /> Record payment · {formatINR(due)} due</Button>);
   if (canDispatch && shipping && (s === "CONFIRMED" || s === "RESERVED"))
     primary.push(
       <Button key="pack" disabled={busy} onClick={async () => { if (await pack.run(order.id)) setDialog("pick"); }}>
@@ -119,7 +123,7 @@ export function OrderActions({ detail }: { detail: OrderDetail }) {
   return (
     <>
       {primary}
-      <Button variant="outline" onClick={() => setDialog("invoice")} className="hidden sm:inline-flex" disabled={order.paymentStatus === "PENDING"}>
+      <Button variant="outline" onClick={() => setDialog("invoice")} className="hidden sm:inline-flex" disabled={s === "PAYMENT_PENDING" || s === "NEW"}>
         <Printer /> Invoice
       </Button>
       <DropdownMenu>
@@ -147,8 +151,8 @@ export function OrderActions({ detail }: { detail: OrderDetail }) {
               <ExternalLink /> Open tracking page
             </a>
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setDialog("invoice")} disabled={order.paymentStatus === "PENDING"}>
-            <Printer /> Print invoice
+          <DropdownMenuItem onSelect={() => setDialog("invoice")} disabled={s === "PAYMENT_PENDING" || s === "NEW"}>
+            <Printer /> Invoice / PDF
           </DropdownMenuItem>
           {cancellable && (
             <>
@@ -162,6 +166,7 @@ export function OrderActions({ detail }: { detail: OrderDetail }) {
       </DropdownMenu>
 
       <PaymentDialog detail={detail} open={dialog === "payment"} onClose={close} />
+      <BalancePaymentDialog detail={detail} open={dialog === "balance"} onClose={close} />
       <CancelDialog detail={detail} open={dialog === "cancel"} onClose={close} />
       <ReturnDialog detail={detail} open={dialog === "return"} onClose={close} />
       <NoteDialog orderId={order.id} open={dialog === "note"} onClose={close} />
@@ -207,6 +212,57 @@ function PaymentDialog({ detail, open, onClose }: { detail: OrderDetail; open: b
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button disabled={pending} onClick={async () => { if (await run(detail.order.id, { method, reference: reference.trim() })) onClose(); }}>
             <CreditCard /> Confirm {formatINR(detail.order.total)}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BalancePaymentDialog({ detail, open, onClose }: { detail: OrderDetail; open: boolean; onClose: () => void }) {
+  const due = balanceDue(detail.order);
+  const [method, setMethod] = useState<PaymentMethod>("UPI");
+  const [amount, setAmount] = useState(String(due));
+  const [reference, setReference] = useState("");
+  const { run, pending } = useOrderAction(recordOrderPayment, `Payment recorded for #${detail.order.number}`);
+  const value = Number(amount) || 0;
+  const valid = value > 0 && value <= due;
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Record payment</DialogTitle>
+          <DialogDescription>
+            {formatINR(due)} is due from {detail.order.customer.name} on order #{detail.order.number}. Part payments are fine; the invoice QR updates to the new balance.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="bal-amount">Amount received</Label>
+              <Input id="bal-amount" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} className="tabular" aria-invalid={!valid || undefined} />
+            </div>
+            <div className="space-y-2">
+              <Label>Method</Label>
+              <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(["UPI", "CASH", "CARD", "NETBANKING"] as const).map((m) => (
+                    <SelectItem key={m} value={m}>{PAYMENT_METHOD_LABELS[m]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="bal-ref">Reference (optional)</Label>
+            <Input id="bal-ref" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="UTR / receipt no." className="font-mono" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button disabled={pending || !valid} onClick={async () => { if (await run(detail.order.id, { method, amount: value, reference: reference.trim() })) onClose(); }}>
+            <CreditCard /> Record {formatINR(value)}
           </Button>
         </DialogFooter>
       </DialogContent>

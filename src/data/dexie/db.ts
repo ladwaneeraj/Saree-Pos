@@ -11,6 +11,7 @@ import type {
   InventoryDraft,
   InventoryItem,
   InventoryMovement,
+  InvoiceFile,
   Media,
   MetaRecord,
   Notification,
@@ -19,6 +20,7 @@ import type {
   Payment,
   Purchase,
   PurchaseItem,
+  PurchasePayment,
   ReturnRequest,
   Review,
   SettingsRecord,
@@ -43,6 +45,8 @@ export class ShopDatabase extends Dexie {
   suppliers!: Table<Supplier, string>;
   purchases!: Table<Purchase, string>;
   purchaseItems!: Table<PurchaseItem, string>;
+  purchasePayments!: Table<PurchasePayment, string>;
+  invoices!: Table<InvoiceFile, string>;
   customers!: Table<Customer, string>;
   orders!: Table<Order, string>;
   orderItems!: Table<OrderItem, string>;
@@ -92,5 +96,30 @@ export class ShopDatabase extends Dexie {
       counters: "key",
       meta: "key",
     });
+    this.version(2)
+      .stores({
+        purchasePayments: "id, purchaseId, createdAt",
+        invoices: "id, orderId, createdAt",
+      })
+      .upgrade(async (tx) => {
+        // Fields added in version 2. Existing rows get the values the old code implied.
+        await tx.table("orders").toCollection().modify((o: Order) => {
+          if (o.amountPaid == null) o.amountPaid = o.paymentStatus === "PAID" || o.paymentStatus === "PARTIALLY_REFUNDED" ? o.total : 0;
+        });
+        await tx.table("purchases").toCollection().modify((p: Purchase) => {
+          p.gstRate ??= 0;
+          p.gstAmount ??= 0;
+          p.grandTotal ??= p.totalCost;
+          p.amountPaid ??= p.status === "CANCELLED" ? 0 : p.grandTotal;
+          p.paymentStatus ??= p.amountPaid >= p.grandTotal ? "PAID" : p.amountPaid > 0 ? "PARTIAL" : "UNPAID";
+          p.dueDate ??= null;
+        });
+        await tx.table("suppliers").toCollection().modify((s: Supplier) => {
+          s.code ??= "";
+        });
+        await tx.table("inventoryDrafts").toCollection().modify((d: InventoryDraft) => {
+          d.quantity ??= 1;
+        });
+      });
   }
 }

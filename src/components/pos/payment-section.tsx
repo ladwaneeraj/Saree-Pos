@@ -1,6 +1,6 @@
 "use client";
 
-import { Banknote, CreditCard, Plus, QrCode, Split, X } from "lucide-react";
+import { Banknote, BookOpen, CreditCard, Plus, QrCode, Split, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,18 +16,19 @@ const TENDERS: { value: PosTender; label: string; icon: typeof Banknote }[] = [
   { value: "UPI", label: "UPI", icon: QrCode },
   { value: "CARD", label: "Card", icon: CreditCard },
   { value: "SPLIT", label: "Split", icon: Split },
+  { value: "CREDIT", label: "Pay later", icon: BookOpen },
 ];
 
 const SPLIT_METHODS: PaymentMethod[] = ["CASH", "UPI", "CARD"];
 
-export function PaymentSection({ total, plan, upiId }: { total: number; plan: PaymentPlan; upiId: string }) {
+export function PaymentSection({ total, plan, upiId, hasCustomer, creditMethod, onCreditMethod }: { total: number; plan: PaymentPlan; upiId: string; hasCustomer: boolean; creditMethod: PaymentMethod; onCreditMethod: (m: PaymentMethod) => void }) {
   const { tender, setTender, tendered, setTendered, reference, setReference, split, setSplit } = usePosDraft();
 
   const updateRow = (id: string, patch: Partial<{ method: PaymentMethod; amount: string }>) => setSplit(split.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
   return (
     <div className="space-y-2.5">
-      <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted p-1" role="radiogroup" aria-label="Payment method">
+      <div className="grid grid-cols-5 gap-1 rounded-xl bg-muted p-1" role="radiogroup" aria-label="Payment method">
         {TENDERS.map((t) => (
           <button
             key={t.value}
@@ -74,6 +75,32 @@ export function PaymentSection({ total, plan, upiId }: { total: number; plan: Pa
         <div className="flex items-center gap-2">
           <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={tender === "UPI" ? "UPI reference / UTR (optional)" : "Card approval code (optional)"} className="bg-card" />
           {tender === "UPI" && <span className="hidden text-xs whitespace-nowrap text-muted-foreground sm:block">Pay to {upiId}</span>}
+        </div>
+      )}
+
+      {tender === "CREDIT" && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Select value={creditMethod} onValueChange={(v) => onCreditMethod(v as PaymentMethod)}>
+              <SelectTrigger className="w-28 bg-card" aria-label="Advance method"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {SPLIT_METHODS.map((m) => <SelectItem key={m} value={m}>{PAYMENT_METHOD_LABELS[m]}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <div className="relative flex-1">
+              <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+              <Input inputMode="numeric" value={tendered} onChange={(e) => setTendered(e.target.value.replace(/\D/g, ""))} placeholder="0" className="bg-card pl-7 tabular" aria-label="Amount received now" />
+            </div>
+            <div className="min-w-28 text-right text-sm">
+              Balance <span className={cn("font-semibold tabular", plan.credit > 0 ? "text-destructive" : "text-muted-foreground")}>{formatINR(plan.credit)}</span>
+            </div>
+          </div>
+          <p className={cn("text-xs", hasCustomer ? "text-muted-foreground" : "text-destructive")}>
+            {hasCustomer
+              ? "The balance is recorded against the customer. The invoice carries a UPI QR for the amount due."
+              : "Add the customer first so the balance has a name and number against it."}
+          </p>
+          {plan.message && <p className="text-xs text-destructive">{plan.message}</p>}
         </div>
       )}
 

@@ -50,6 +50,7 @@ function cellHasError(row: InventoryDraft, col: ColKey, lk: Lookups): boolean {
     case "colour": return !row.colourId;
     case "fabric": return !design && !!row.designName.trim() && !row.fabricId;
     case "cost": return row.cost == null;
+    case "quantity": return !(row.quantity >= 1);
     case "mrp": return row.mrp == null || row.mrp <= 0;
     case "price": return row.price == null || row.price <= 0 || (row.mrp != null && row.price > row.mrp);
     default: return false;

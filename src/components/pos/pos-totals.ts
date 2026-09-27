@@ -29,14 +29,28 @@ export function computePosTotals(
 export interface PaymentPlan {
   payments: { method: PaymentMethod; amount: number; reference?: string }[];
   valid: boolean;
+  /** Amount left unpaid on a credit sale. */
+  credit: number;
   /** Amount still to allocate (split) or cash short (cash). Positive means more is needed. */
   remaining: number;
   change: number;
   message: string | null;
 }
 
-export function planPayments(total: number, tender: PosTender, tendered: string, reference: string, split: SplitRow[]): PaymentPlan {
+export function planPayments(total: number, tender: PosTender, tendered: string, reference: string, split: SplitRow[], creditMethod: PaymentMethod = "CASH"): PaymentPlan {
   const ref = reference.trim() || undefined;
+  if (tender === "CREDIT") {
+    const received = Math.max(0, Math.round(Number(tendered) || 0));
+    const credit = total - received;
+    return {
+      payments: received > 0 ? [{ method: creditMethod, amount: Math.min(received, total), reference: ref }] : [],
+      valid: total > 0 && received < total,
+      credit: Math.max(0, credit),
+      remaining: 0,
+      change: 0,
+      message: received >= total ? "use Cash, UPI or Card when the full amount is paid" : null,
+    };
+  }
   if (tender === "SPLIT") {
     const rows = split.map((r) => ({ method: r.method, amount: Number(r.amount) || 0 })).filter((r) => r.amount > 0);
     const sum = rows.reduce((s, r) => s + r.amount, 0);
@@ -44,6 +58,7 @@ export function planPayments(total: number, tender: PosTender, tendered: string,
     return {
       payments: rows,
       valid: total > 0 && remaining === 0 && rows.length > 0,
+      credit: 0,
       remaining,
       change: 0,
       message: remaining > 0 ? "still to allocate" : remaining < 0 ? "more than the total" : null,
@@ -55,12 +70,13 @@ export function planPayments(total: number, tender: PosTender, tendered: string,
     return {
       payments: [{ method: "CASH", amount: total }],
       valid: total > 0 && short <= 0,
+      credit: 0,
       remaining: Math.max(0, short),
       change: Math.max(0, -short),
       message: short > 0 ? "short" : null,
     };
   }
-  return { payments: [{ method: tender, amount: total, reference: ref }], valid: total > 0, remaining: 0, change: 0, message: null };
+  return { payments: [{ method: tender, amount: total, reference: ref }], valid: total > 0, credit: 0, remaining: 0, change: 0, message: null };
 }
 
 /** Quick cash buttons: exact, then the next round notes above the total. */

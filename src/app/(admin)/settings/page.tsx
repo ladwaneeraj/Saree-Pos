@@ -1,9 +1,11 @@
 "use client";
 
-import { Bell, Building2, Database, Percent, Store, Tag, Truck, Users } from "lucide-react";
+import { Bell, Building2, Database, ListTree, Percent, Sparkles, Store, Tag, Truck, Users } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/shared/page-header";
+import { AiForm } from "@/components/settings/ai-form";
+import { CatalogListsForm, MasterLists } from "@/components/settings/catalog-lists";
 import { DemoData } from "@/components/settings/demo-data";
 import { LabelsForm } from "@/components/settings/labels-form";
 import { NotificationsForm } from "@/components/settings/notifications-form";
@@ -21,7 +23,9 @@ const TABS = [
   { value: "shipping", label: "Shipping", icon: Truck, render: () => <ShippingForm /> },
   { value: "users", label: "Users & roles", icon: Users, render: () => <UsersRoles /> },
   { value: "notifications", label: "Notifications", icon: Bell, render: () => <NotificationsForm /> },
-  { value: "labels", label: "Labels", icon: Tag, render: () => <LabelsForm /> },
+  { value: "labels", label: "SKU & labels", icon: Tag, render: () => <LabelsForm /> },
+  { value: "catalog", label: "Catalogue lists", icon: ListTree, render: () => <><CatalogListsForm /><MasterLists /></> },
+  { value: "ai", label: "AI", icon: Sparkles, render: () => <AiForm /> },
   { value: "demo", label: "Demo data", icon: Database, render: () => <DemoData /> },
 ] as const;
 

@@ -4,7 +4,8 @@ import { create } from "zustand";
 import type { PaymentMethod } from "@/domain/types";
 import { newId } from "@/lib/id";
 
-export type PosTender = "CASH" | "UPI" | "CARD" | "SPLIT";
+/** CREDIT: part or no payment now, balance recorded as receivable. Needs a customer. */
+export type PosTender = "CASH" | "UPI" | "CARD" | "SPLIT" | "CREDIT";
 
 export type PosCustomer =
   | { kind: "existing"; id: string; name: string; phone: string }

@@ -16,12 +16,14 @@ import { INVENTORY_STATUSES } from "@/domain/types";
 import { DomainError } from "@/domain/errors";
 import { assertPermission } from "@/domain/permissions";
 import { effectiveMrp, effectivePrice, priceSource } from "@/domain/rules/pricing";
-import { ageInDays, formatSku } from "@/domain/rules/inventory";
+import { ageInDays } from "@/domain/rules/inventory";
+import { skuFromTemplate, type SkuContext } from "@/domain/rules/labels";
 import { newId } from "@/lib/id";
 import { recordAudit } from "./audit";
 import { createDesignRecord, getCatalog, type DesignInput } from "./catalog";
 import { currentActor, now } from "./context";
 import { buildMovement, changeItems, loadItemsOrThrow } from "./inventory-core";
+import { getSettings } from "./settings";
 
 /* ------------------------------------------------------------------ */
 /* Creating pieces                                                     */
@@ -40,7 +42,26 @@ export interface NewPieceInput {
   quantity?: number;
   /** Explicit SKU (imports from an older system). Omit to auto-generate. */
   sku?: string | null;
+  /** Supplier for the {vendor} SKU token when the piece is not part of a purchase. */
+  supplierId?: string | null;
   notes?: string;
+}
+
+/** Everything the SKU template needs, loaded once per batch. */
+async function skuContextFactory(): Promise<(input: { supplierId: string | null; design: Design }, seq: number) => SkuContext> {
+  const [settings, catalog] = await Promise.all([getSettings(), getCatalog()]);
+  const patternCode = new Map(settings.catalog.patterns.map((p) => [p.name.toLowerCase(), p.code]));
+  return ({ supplierId, design }, seq) => ({
+    shopCode: settings.business.shopCode,
+    vendorCode: (supplierId && catalog.supplierById.get(supplierId)?.code) || settings.labels.defaultVendorCode,
+    patternCode: patternCode.get(design.pattern.trim().toLowerCase()) ?? "",
+    fabricName: catalog.fabricById.get(design.fabricId)?.name ?? "",
+    seq,
+  });
+}
+
+async function skuTemplate(): Promise<string> {
+  return (await getSettings()).labels.skuTemplate;
 }
 
 export type PieceSource = "QUICK_ADD" | "BULK" | "DUPLICATE" | "PURCHASE" | "IMPORT";
@@ -121,6 +142,13 @@ export async function createPiecesInTx(inputs: NewPieceInput[], options: CreateP
 
   const generatedCount = inputs.reduce((sum, i) => sum + (i.sku ? 0 : (i.quantity ?? 1)), 0);
   let nextSku = generatedCount ? await r.counters.next("sku", generatedCount) : 0;
+  const [template, skuContext] = await Promise.all([skuTemplate(), skuContextFactory()]);
+  const generateSku = (design: Design, supplierId: string | null): string => {
+    // The counter guarantees uniqueness only when the template includes {seq}; validateSkuTemplate enforces that in settings.
+    let sku = skuFromTemplate(template, skuContext({ supplierId, design }, nextSku++));
+    while (explicitSkus.includes(sku)) sku = skuFromTemplate(template, skuContext({ supplierId, design }, nextSku++));
+    return sku;
+  };
   const t = now();
   const receivedAt = options.receivedAt ?? t;
   const items: InventoryItem[] = [];
@@ -129,10 +157,11 @@ export async function createPiecesInTx(inputs: NewPieceInput[], options: CreateP
   inputs.forEach((input, i) => {
     const design = designs[i]!;
     const qty = input.sku ? 1 : (input.quantity ?? 1);
+    const supplierId = options.purchase?.supplierId ?? input.supplierId ?? null;
     for (let n = 0; n < qty; n++) {
       const item: InventoryItem = {
         id: newId("itm"),
-        sku: input.sku ? input.sku.trim().toUpperCase() : formatSku(nextSku++),
+        sku: input.sku ? input.sku.trim().toUpperCase() : generateSku(design, supplierId),
         designId: design.id,
         colourId: input.colourId,
         cost: Math.round(input.cost),
@@ -142,7 +171,7 @@ export async function createPiecesInTx(inputs: NewPieceInput[], options: CreateP
         status: "AVAILABLE",
         imageIds: input.imageIds,
         purchaseId: options.purchase?.id ?? null,
-        supplierId: options.purchase?.supplierId ?? null,
+        supplierId,
         receivedAt,
         reservation: null,
         holderId: null,
@@ -190,9 +219,12 @@ export async function createPieces(inputs: NewPieceInput[], options: CreatePiece
   return transaction(() => createPiecesInTx(inputs, options));
 }
 
-export async function peekNextSkus(count: number): Promise<string[]> {
-  const start = await repos().counters.peek("sku");
-  return Array.from({ length: count }, (_, i) => formatSku(start + i));
+/** SKUs the next save would assign, for previews. Pattern and vendor come from the chosen design and supplier. */
+export async function peekNextSkus(count: number, ctx: { designId?: string | null; pattern?: string; fabricId?: string | null; supplierId?: string | null } = {}): Promise<string[]> {
+  const [start, template, skuContext] = await Promise.all([repos().counters.peek("sku"), skuTemplate(), skuContextFactory()]);
+  const design = ctx.designId ? await repos().designs.get(ctx.designId) : undefined;
+  const preview = { pattern: design?.pattern ?? ctx.pattern ?? "", fabricId: design?.fabricId ?? ctx.fabricId ?? "" } as Design;
+  return Array.from({ length: count }, (_, i) => skuFromTemplate(template, skuContext({ supplierId: ctx.supplierId ?? null, design: preview }, start + i)));
 }
 
 /* ------------------------------------------------------------------ */
@@ -587,9 +619,12 @@ export interface LabelData {
   designName: string;
   fabricName: string;
   colourName: string;
+  pattern: string;
+  /** Current selling price. Printed only when label settings ask for it. */
+  price: number;
 }
 
-/** Label payload. Deliberately has no price: the barcode encodes the SKU only. */
+/** Label payload. The barcode encodes the SKU only; the price is printed as text when enabled. */
 export async function getLabels(itemIds: string[]): Promise<LabelData[]> {
   const r = repos();
   const [items, catalog] = await Promise.all([r.inventory.getMany(itemIds), getCatalog()]);
@@ -603,6 +638,8 @@ export async function getLabels(itemIds: string[]): Promise<LabelData[]> {
       designName: design?.name ?? "",
       fabricName: design ? (catalog.fabricById.get(design.fabricId)?.name ?? "") : "",
       colourName: catalog.colourById.get(item.colourId)?.name ?? "",
+      pattern: design?.pattern ?? "",
+      price: design ? effectivePrice(item, design) : (item.priceOverride ?? 0),
     };
   });
 }

@@ -22,6 +22,7 @@ import type {
 import { DomainError } from "@/domain/errors";
 import { assertPermission } from "@/domain/permissions";
 import { CANCELLABLE_STATUSES, assertOrderTransition } from "@/domain/rules/orders";
+import { balanceDue, paymentStatusFor } from "@/domain/rules/payments";
 import { effectiveMrp, effectivePrice, splitInclusiveTax } from "@/domain/rules/pricing";
 import { newId } from "@/lib/id";
 import { formatINR } from "@/lib/format";
@@ -121,10 +122,14 @@ export async function createOrderInTx(spec: CreateOrderSpec): Promise<CreatedOrd
   const discount = Math.max(0, Math.min(Math.round(spec.orderDiscount ?? 0), subtotal));
   const shippingFee = Math.max(0, Math.round(spec.shippingFee ?? 0));
   const total = subtotal - discount + shippingFee;
-  const paid = spec.payments.reduce((s, p) => s + p.amount, 0);
+  const paid = spec.payments.reduce((s, p) => s + Math.round(p.amount), 0);
   if (spec.paymentStatus === "PAID" && paid !== total) {
     throw new DomainError(`Payments (${formatINR(paid)}) must equal the order total (${formatINR(total)})`);
   }
+  if (spec.paymentStatus === "PARTIAL" && !(paid > 0 && paid < total)) {
+    throw new DomainError(`A part payment must be between zero and the order total (${formatINR(total)})`);
+  }
+  if (paid > total) throw new DomainError(`Payments (${formatINR(paid)}) are more than the order total (${formatINR(total)})`);
 
   const number = await r.counters.next("order");
   const snapshot = spec.customerSnapshot ?? {
@@ -147,6 +152,7 @@ export async function createOrderInTx(spec: CreateOrderSpec): Promise<CreatedOrd
     discount,
     shippingFee,
     total,
+    amountPaid: paid,
     taxRate: settings.tax.gstRate,
     taxAmount: splitInclusiveTax(total - shippingFee, settings.tax.gstRate).tax,
     notes: spec.notes ?? "",
@@ -250,7 +256,7 @@ export async function confirmPaymentInTx(order: Order, input: { method: PaymentM
     reference: input.reference ?? "",
     createdAt: t,
   });
-  let updated = await setOrderStatusInTx(order, "CONFIRMED", "Payment confirmed", actor, { paymentStatus: "PAID", paymentDueAt: null }, `${PAYMENT_METHOD_LABELS[input.method]} ${formatINR(order.total)}`);
+  let updated = await setOrderStatusInTx(order, "CONFIRMED", "Payment confirmed", actor, { paymentStatus: "PAID", amountPaid: order.total, paymentDueAt: null }, `${PAYMENT_METHOD_LABELS[input.method]} ${formatINR(order.total)}`);
   const held = await orderReservedItems(updated);
   await r.inventory.bulkPut(held.map((i) => ({ ...i, reservation: { ...i.reservation!, expiresAt: null }, updatedAt: t })));
   updated = await setOrderStatusInTx(updated, "RESERVED", "Items reserved", actor, {}, `${held.length} piece${held.length === 1 ? "" : "s"} allocated`);
@@ -273,6 +279,44 @@ export async function confirmPayment(orderId: string, input: { method: PaymentMe
   return transaction(async () => confirmPaymentInTx(await loadOrder(orderId), input, actor));
 }
 
+/**
+ * Records money received against an order that was handed over with a balance due (credit sale).
+ * The order status does not change; only amountPaid and paymentStatus move.
+ */
+export async function recordOrderPayment(orderId: string, input: { method: PaymentMethod; amount: number; reference?: string }): Promise<Order> {
+  const actor = currentActor();
+  assertPermission(actor, "orders:manage");
+  return transaction(async () => {
+    const r = repos();
+    const order = await loadOrder(orderId);
+    const amount = Math.round(input.amount);
+    const due = balanceDue(order);
+    if (order.status === "CANCELLED") throw new DomainError(`Order #${order.number} is cancelled`);
+    if (order.status === "NEW" || order.status === "PAYMENT_PENDING") throw new DomainError("Use Confirm payment for orders that are still awaiting payment");
+    if (!(amount > 0)) throw new DomainError("Enter the amount received");
+    if (amount > due) throw new DomainError(`Only ${formatINR(due)} is due on order #${order.number}`);
+    const t = now();
+    await r.payments.add({ id: newId("pay"), orderId: order.id, kind: "PAYMENT", method: input.method, amount, reference: input.reference ?? "", createdAt: t });
+    const amountPaid = order.amountPaid + amount;
+    const updated = await appendOrderEventInTx(
+      { ...order, amountPaid, paymentStatus: paymentStatusFor(order.total, amountPaid) },
+      amountPaid >= order.total ? "Balance received, fully paid" : `Part payment received, ${formatINR(order.total - amountPaid)} due`,
+      actor,
+      `${PAYMENT_METHOD_LABELS[input.method]} ${formatINR(amount)}${input.reference ? ` · ${input.reference}` : ""}`,
+    );
+    await recordAudit({
+      action: "PAYMENT_RECORDED",
+      entityType: "ORDER",
+      entityId: order.id,
+      entityLabel: `#${order.number}`,
+      summary: `${PAYMENT_METHOD_LABELS[input.method]} payment of ${formatINR(amount)} received, ${formatINR(updated.total - updated.amountPaid)} due`,
+      actor,
+    });
+    await recomputeCustomerStatsInTx(order.customerId);
+    return updated;
+  });
+}
+
 export async function cancelOrderInTx(order: Order, reason: string, actor: Actor): Promise<Order> {
   if (!CANCELLABLE_STATUSES.includes(order.status)) {
     throw new DomainError(`Order #${order.number} has left the shop and cannot be cancelled. Create a return instead.`);
@@ -291,8 +335,9 @@ export async function cancelOrderInTx(order: Order, reason: string, actor: Actor
   }, actor);
 
   let paymentStatus = order.paymentStatus;
+  let amountPaid = order.amountPaid;
   let refundNote = "";
-  if (order.paymentStatus === "PAID") {
+  if ((order.paymentStatus === "PAID" || order.paymentStatus === "PARTIAL") && order.amountPaid > 0) {
     const payments = await r.payments.listByOrder(order.id);
     const method = payments.find((p) => p.kind === "PAYMENT")?.method ?? "UPI";
     await r.payments.add({
@@ -300,14 +345,15 @@ export async function cancelOrderInTx(order: Order, reason: string, actor: Actor
       orderId: order.id,
       kind: "REFUND",
       method,
-      amount: order.total,
+      amount: order.amountPaid,
       reference: `RFND-${order.number}`,
       createdAt: now(),
     });
     paymentStatus = "REFUNDED";
-    refundNote = `A refund of ${formatINR(order.total)} has been initiated to your original payment method.`;
+    refundNote = `A refund of ${formatINR(order.amountPaid)} has been initiated to your original payment method.`;
+    amountPaid = 0;
   }
-  const updated = await setOrderStatusInTx(order, "CANCELLED", "Order cancelled", actor, { paymentStatus, paymentDueAt: null }, reason);
+  const updated = await setOrderStatusInTx(order, "CANCELLED", "Order cancelled", actor, { paymentStatus, amountPaid, paymentDueAt: null }, reason);
   await recordAudit({
     action: "ORDER_CANCELLED",
     entityType: "ORDER",

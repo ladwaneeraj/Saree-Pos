@@ -48,6 +48,8 @@ export interface Fabric {
 export interface Supplier {
   id: ID;
   name: string;
+  /** Short vendor code used in SKU templates ({vendor}), e.g. "VS". */
+  code: string;
   contactName: string;
   phone: string;
   email: string;
@@ -93,9 +95,9 @@ export interface Design {
   lengthM: number;
   blouseIncluded: boolean;
   description: string;
-  /** Default MRP for pieces of this design. */
+  /** Default MRP for pieces of this design. 0 means not set yet; pieces then carry their own price. */
   mrp: number;
-  /** Default selling price for pieces of this design. */
+  /** Default selling price for pieces of this design. 0 means not set yet. */
   price: number;
   /** Design gallery. The first image is the primary image. */
   imageIds: ID[];
@@ -204,6 +206,8 @@ export interface InventoryDraft {
   mrp: number | null;
   price: number | null;
   location: string;
+  /** Identical pieces to create from this row. Each gets its own SKU. */
+  quantity: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -213,6 +217,7 @@ export interface InventoryDraft {
 /* ------------------------------------------------------------------ */
 
 export type PurchaseStatus = "DRAFT" | "RECEIVED" | "CANCELLED";
+export type PurchasePaymentStatus = "UNPAID" | "PARTIAL" | "PAID";
 
 export interface Purchase {
   id: ID;
@@ -222,7 +227,16 @@ export interface Purchase {
   date: Timestamp;
   status: PurchaseStatus;
   pieceCount: number;
+  /** Sum of line quantities × cost, before GST. */
   totalCost: number;
+  /** GST as printed on the supplier bill. gstAmount is the total tax; the split is derived for display. */
+  gstRate: number;
+  gstAmount: number;
+  /** Bill total payable to the supplier (totalCost + gstAmount + other charges). */
+  grandTotal: number;
+  amountPaid: number;
+  paymentStatus: PurchasePaymentStatus;
+  dueDate: Timestamp | null;
   notes: string;
   receivedAt: Timestamp | null;
   createdAt: Timestamp;
@@ -239,6 +253,17 @@ export interface PurchaseItem {
   mrp: number;
   price: number;
   location: string;
+  createdAt: Timestamp;
+}
+
+/** Money paid to a supplier against a purchase bill. */
+export interface PurchasePayment {
+  id: ID;
+  purchaseId: ID;
+  amount: number;
+  method: PaymentMethod;
+  reference: string;
+  note: string;
   createdAt: Timestamp;
 }
 
@@ -301,7 +326,8 @@ export const ORDER_STATUSES = [
 ] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
-export type PaymentStatus = "PENDING" | "PAID" | "PARTIALLY_REFUNDED" | "REFUNDED";
+/** PARTIAL: some money received, balance outstanding (credit sale). */
+export type PaymentStatus = "PENDING" | "PARTIAL" | "PAID" | "PARTIALLY_REFUNDED" | "REFUNDED";
 export type Fulfilment = "IN_STORE" | "SHIPPING";
 export type PaymentMethod = "CASH" | "UPI" | "CARD" | "NETBANKING" | "STORE_CREDIT";
 
@@ -337,6 +363,8 @@ export interface Order {
   discount: number;
   shippingFee: number;
   total: number;
+  /** Payments received minus refunds. Balance due is total − amountPaid. */
+  amountPaid: number;
   /** GST snapshot at the time of sale. Prices are tax-inclusive. */
   taxRate: number;
   taxAmount: number;
@@ -381,6 +409,17 @@ export interface Payment {
   /** Always positive. Refunds are identified by kind. */
   amount: number;
   reference: string;
+  createdAt: Timestamp;
+}
+
+/** A generated invoice PDF kept against an order. Regenerated whenever a payment changes the balance. */
+export interface InvoiceFile {
+  id: ID;
+  orderId: ID;
+  number: string;
+  balance: number;
+  size: number;
+  blob: Blob;
   createdAt: Timestamp;
 }
 
@@ -588,6 +627,7 @@ export const AUDIT_ACTIONS = [
   "PAYMENT_RECORDED",
   "RETURN_UPDATED",
   "PURCHASE_RECEIVED",
+  "PURCHASE_PAYMENT",
   "SETTINGS_CHANGED",
   "DEMO_RESET",
   "DATA_IMPORTED",
@@ -616,10 +656,17 @@ export interface BusinessSettings {
   phone: string;
   whatsapp: string;
   email: string;
+  website: string;
   address: string;
   city: string;
   state: string;
   pincode: string;
+  /** Short shop code used in SKU templates ({shop}), e.g. "DS". */
+  shopCode: string;
+  /** Payee UPI ID (VPA) for payment QR codes on unpaid invoices. */
+  upiId: string;
+  /** Terms printed at the bottom of every invoice. */
+  invoiceTerms: string;
 }
 
 export interface StoreSettings {
@@ -654,10 +701,47 @@ export interface NotificationSettings {
   templates: Record<NotificationEvent, string>;
 }
 
+export type LabelPriceMode = "PLAIN" | "CODED";
+
 export interface LabelSettings {
   size: "THERMAL_50x25" | "A4_3x8";
+  /**
+   * SKU template for new pieces. Tokens: {shop} (business shop code), {vendor} (supplier code),
+   * {pattern} (pattern code from the catalogue lists), {fabric} (first 3 letters of the fabric),
+   * {seq} or {seq:N} (running number, N digits). Anything else is printed as is.
+   */
+  skuTemplate: string;
+  /** Used for {vendor} when a piece is not linked to a supplier. */
+  defaultVendorCode: string;
+  /** Text at the top of the label. Empty prints the business name. */
+  headerText: string;
   showDesignName: boolean;
   showColour: boolean;
+  showFabric: boolean;
+  showPattern: boolean;
+  /** Prints the selling price. Reprint labels when prices change. */
+  showPrice: boolean;
+  priceMode: LabelPriceMode;
+  /** Ten distinct letters standing for the digits 0-9 in CODED mode, e.g. "SILKWEAVER". */
+  priceCipher: string;
+}
+
+/** Pattern option for design dropdowns. The code feeds the {pattern} SKU token. */
+export interface PatternOption {
+  name: string;
+  code: string;
+}
+
+/** Owner-managed dropdown values for design entry forms. */
+export interface CatalogSettings {
+  patterns: PatternOption[];
+  borders: string[];
+}
+
+/** Claude API access for reading supplier bills. The key stays in this browser's database. */
+export interface AiSettings {
+  anthropicApiKey: string;
+  model: string;
 }
 
 export interface AppSettings {
@@ -667,6 +751,8 @@ export interface AppSettings {
   shipping: ShippingSettings;
   notifications: NotificationSettings;
   labels: LabelSettings;
+  catalog: CatalogSettings;
+  ai: AiSettings;
   users: DemoUser[];
 }
 

@@ -18,6 +18,7 @@ import type {
   InventoryItem,
   InventoryMovement,
   InventoryStatus,
+  InvoiceFile,
   Media,
   Notification,
   Order,
@@ -26,6 +27,7 @@ import type {
   Payment,
   Purchase,
   PurchaseItem,
+  PurchasePayment,
   ReturnRequest,
   ReturnStatus,
   Review,
@@ -116,6 +118,14 @@ export interface PurchaseItemRepository extends Repository<PurchaseItem> {
   listByPurchase(purchaseId: string): Promise<PurchaseItem[]>;
 }
 
+export interface PurchasePaymentRepository extends Repository<PurchasePayment> {
+  listByPurchase(purchaseId: string): Promise<PurchasePayment[]>;
+}
+
+export interface InvoiceRepository extends Repository<InvoiceFile> {
+  listByOrder(orderId: string): Promise<InvoiceFile[]>;
+}
+
 export interface ReturnRepository extends Repository<ReturnRequest> {
   listByOrder(orderId: string): Promise<ReturnRequest[]>;
   listByStatuses(statuses: readonly ReturnStatus[]): Promise<ReturnRequest[]>;
@@ -183,6 +193,8 @@ export interface Repositories {
   suppliers: Repository<Supplier>;
   purchases: PurchaseRepository;
   purchaseItems: PurchaseItemRepository;
+  purchasePayments: PurchasePaymentRepository;
+  invoices: InvoiceRepository;
   customers: CustomerRepository;
   orders: OrderRepository;
   orderItems: OrderItemRepository;

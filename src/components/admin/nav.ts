@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Boxes,
+  HandCoins,
   History,
   LayoutDashboard,
   MessageCircle,
@@ -49,6 +50,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Insights",
     items: [
       { href: "/reports", label: "Reports", icon: BarChart3, permission: "reports:view" },
+      { href: "/dues", label: "Payables & receivables", icon: HandCoins, permission: "orders:view" },
       { href: "/activity", label: "Activity log", icon: History, permission: "audit:view" },
     ],
   },

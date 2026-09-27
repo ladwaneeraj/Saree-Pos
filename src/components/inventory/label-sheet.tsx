@@ -1,5 +1,6 @@
 import type { LabelData } from "@/services/inventory";
 import type { LabelSettings } from "@/domain/types";
+import { labelPriceText } from "@/domain/rules/labels";
 import { cn } from "@/lib/utils";
 import { Barcode } from "@/components/shared/barcode";
 
@@ -10,30 +11,30 @@ export const LABEL_SIZES: Record<LabelSize, { name: string; hint: string; width:
   A4_3x8: { name: "A4 sheet, 3 × 8", hint: "24 labels per A4 sticker sheet", width: "70mm", height: "37.125mm" },
 };
 
-export interface LabelOptions {
-  size: LabelSize;
-  showDesignName: boolean;
-  showColour: boolean;
-}
+/** Label settings as printed. headerText must already be resolved to the shop name when empty. */
+export type LabelOptions = LabelSettings;
 
-/** One sticker. Carries the SKU barcode only, never a price. */
+/** One sticker. The barcode carries the SKU only; the price, when enabled, is text. */
 export function Label({ label, options }: { label: LabelData; options: LabelOptions }) {
   const dims = LABEL_SIZES[options.size];
   const a4 = options.size === "A4_3x8";
+  const detail = [options.showFabric && label.fabricName, options.showPattern && label.pattern, options.showColour && label.colourName].filter(Boolean).join(" · ");
+  const price = options.showPrice && label.price > 0 ? labelPriceText(label.price, options) : "";
   return (
     <div
       className={cn("flex flex-col items-center justify-center overflow-hidden bg-white text-black", a4 ? "gap-[1mm] px-[4mm] py-[2.5mm]" : "gap-[0.5mm] px-[2.5mm] py-[1.2mm]")}
       style={{ width: dims.width, height: dims.height }}
     >
       <div className={cn("flex w-full items-baseline justify-between gap-[1mm] leading-none", a4 ? "text-[7.5pt]" : "text-[6pt]")}>
-        <span className="shrink-0 font-semibold tracking-[0.08em]">DHANVI SILKS</span>
-        {options.showColour && label.colourName && <span className="truncate">{label.colourName}</span>}
+        <span className="min-w-0 truncate font-semibold tracking-[0.08em] uppercase">{options.headerText}</span>
+        {price && <span className="shrink-0 font-semibold">{price}</span>}
       </div>
       {options.showDesignName && label.designName && (
         <div className={cn("w-full truncate text-center leading-tight", a4 ? "text-[8pt]" : "text-[6.5pt]")}>{label.designName}</div>
       )}
       <Barcode value={label.sku} height={a4 ? 58 : 50} moduleWidth={1.6} className={cn("h-auto w-full", a4 ? "max-h-[15mm]" : "max-h-[10.5mm]")} />
       <div className={cn("font-mono leading-none font-bold tracking-[0.12em]", a4 ? "text-[11pt]" : "text-[9pt]")}>{label.sku}</div>
+      {detail && <div className={cn("w-full truncate text-center leading-none text-black/70", a4 ? "text-[7pt]" : "text-[5.5pt]")}>{detail}</div>}
     </div>
   );
 }

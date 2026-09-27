@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import type { Order } from "@/domain/types";
+import type { Order, PaymentMethod } from "@/domain/types";
 import { useAction } from "@/hooks/use-action";
 import { useSettings } from "@/hooks/use-catalog";
 import { formatINR, formatINRPaise } from "@/lib/format";
@@ -36,9 +36,11 @@ export function CartPanel({ lines, onCompleted, onClose, className }: { lines: H
 
   const gstRate = settings?.tax.gstRate ?? 5;
   const totals = computePosTotals(lines ?? [], draft, gstRate);
-  const plan = planPayments(totals.total, draft.tender, draft.tendered, draft.reference, draft.split);
+  const [creditMethod, setCreditMethod] = useState<PaymentMethod>("CASH");
+  const plan = planPayments(totals.total, draft.tender, draft.tendered, draft.reference, draft.split, creditMethod);
   const count = lines?.length ?? 0;
-  const canComplete = count > 0 && plan.valid && !complete.pending;
+  const needsCustomer = draft.tender === "CREDIT" && !draft.customer;
+  const canComplete = count > 0 && plan.valid && !needsCustomer && !complete.pending;
 
   const onClear = async () => {
     const ok = await confirm({
@@ -60,6 +62,7 @@ export function CartPanel({ lines, onCompleted, onClose, className }: { lines: H
       orderDiscount: totals.orderDiscount,
       customer: c ? (c.kind === "existing" ? { id: c.id } : { name: c.name, phone: c.phone }) : null,
       payments: plan.payments,
+      credit: plan.credit,
       sendReceipt: !!c && draft.sendReceipt,
     });
     if (order) {
@@ -111,7 +114,7 @@ export function CartPanel({ lines, onCompleted, onClose, className }: { lines: H
           </div>
         </dl>
 
-        <PaymentSection total={totals.total} plan={plan} upiId={SHOP_UPI_ID} />
+        <PaymentSection total={totals.total} plan={plan} upiId={settings?.business.upiId || SHOP_UPI_ID} hasCustomer={!!draft.customer} creditMethod={creditMethod} onCreditMethod={setCreditMethod} />
 
         {draft.customer && (
           <label className="flex items-center gap-2 text-sm">
@@ -122,7 +125,7 @@ export function CartPanel({ lines, onCompleted, onClose, className }: { lines: H
 
         <Button size="lg" className="h-12 w-full rounded-xl text-base" disabled={!canComplete} onClick={onComplete} data-testid="pos-complete">
           <CheckCircle2 className="size-5" />
-          {complete.pending ? "Completing sale…" : `Complete sale · ${formatINR(totals.total)}`}
+          {complete.pending ? "Completing sale…" : plan.credit > 0 ? `Complete sale · ${formatINR(plan.credit)} due later` : `Complete sale · ${formatINR(totals.total)}`}
         </Button>
       </div>
       {dialog}

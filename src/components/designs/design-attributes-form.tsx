@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { BorderSelect, CollectionPicker, PatternSelect } from "./design-pickers";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Design } from "@/domain/types";
 import { useAction } from "@/hooks/use-action";
 import { useCatalog } from "@/hooks/use-catalog";
-import { cn } from "@/lib/utils";
 import { updateDesign, type DesignEdit } from "@/services/catalog";
 
 type Fields = Required<Pick<DesignEdit, "name" | "fabricId" | "categoryId" | "collectionIds" | "pattern" | "border" | "blouseIncluded" | "description">> & { lengthM: string };
@@ -64,34 +64,15 @@ export function DesignAttributesForm({ design, canEdit }: { design: Design; canE
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label>Collections</Label>
-          <div className="flex flex-wrap gap-1.5">
-            {catalog?.collections.map((c) => {
-              const on = v.collectionIds.includes(c.id);
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  disabled={!canEdit}
-                  onClick={() => set("collectionIds", on ? v.collectionIds.filter((x) => x !== c.id) : [...v.collectionIds, c.id])}
-                  className={cn(
-                    "inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors disabled:opacity-60",
-                    on ? "border-primary/30 bg-wine-50 text-primary" : "bg-card text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {on && <Check className="size-3" />}
-                  {c.name}
-                </button>
-              );
-            })}
-          </div>
+          <CollectionPicker value={v.collectionIds} onChange={(ids) => set("collectionIds", ids)} disabled={!canEdit} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="da-pattern">Pattern</Label>
-          <Input id="da-pattern" value={v.pattern} disabled={!canEdit} onChange={(e) => set("pattern", e.target.value)} placeholder="Zari buttas" />
+          <PatternSelect id="da-pattern" value={v.pattern} disabled={!canEdit} onChange={(x) => set("pattern", x)} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="da-border">Border</Label>
-          <Input id="da-border" value={v.border} disabled={!canEdit} onChange={(e) => set("border", e.target.value)} placeholder="Temple border" />
+          <BorderSelect id="da-border" value={v.border} disabled={!canEdit} onChange={(x) => set("border", x)} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="da-length">Saree length (m)</Label>
